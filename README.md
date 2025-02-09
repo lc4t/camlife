@@ -2,7 +2,7 @@
 <div align="center">
 <img src="./readme/images/logo.png" alt="screenshot" width="100" />
 <h1>Camlife</h1>
-<p>Camlife is a photography website that showcases photography works</p>
+<p>Camlife is a website that showcases photography works for everyone who loves photography</p>
 <img src="./readme/images/preview.png" alt="screenshot" />
 </div>
 
@@ -68,8 +68,7 @@
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=sun0225SUN/camlife&type=Date)](github.com/sun0225SUN/camlife)
-
+[![Star History Chart](https://api.star-history.com/svg?repos=sun0225SUN/camlife&type=Date)](https://github.com/sun0225SUN/camlife)
 
 
 ## License
