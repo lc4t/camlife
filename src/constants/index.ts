@@ -19,7 +19,8 @@ export const COMPRESS_QUALITY = 0.6
 export const DEFAULT_PHOTO_RATING = 3
 
 /**
- * Address language in Mapbox Geocoding (ISO 639-1 language code)
+ * Address language in geocoding (ISO 639-1 language code)
+ * Used by Nominatim (OpenStreetMap's geocoding service)
  */
 export const ADDRESS_LANGUAGE = 'en'
 

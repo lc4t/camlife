@@ -1,19 +1,12 @@
 'use client'
 
-import 'mapbox-gl/dist/mapbox-gl.css'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import '@/styles/mapbox.css'
 
-import MapboxLanguage from '@mapbox/mapbox-gl-language'
-import mapboxgl from 'mapbox-gl'
-import { useLocale } from 'next-intl'
+import maplibregl from 'maplibre-gl'
 import { useTheme } from 'next-themes'
-import { useCallback, useMemo } from 'react'
-import {
-  FullscreenControl,
-  Map as MapGL,
-  type MapRef,
-  Marker,
-} from 'react-map-gl/mapbox'
+import { useMemo } from 'react'
+import { FullscreenControl, Map as MapGL, Marker } from 'react-map-gl/maplibre'
 import { env } from '@/env'
 
 interface locationMapProps {
@@ -36,27 +29,18 @@ export function LocationMap({
   zoom,
 }: locationMapProps) {
   const { resolvedTheme } = useTheme()
-  const locale = useLocale()
-
-  const mapRef = useCallback(
-    (ref: MapRef) => {
-      if (ref && locale === 'zh') {
-        ref
-          .getMap()
-          .addControl(new MapboxLanguage({ defaultLanguage: 'zh-Hans' }))
-      }
-    },
-    [locale],
-  )
-
-  const mapboxToken = env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 
   const mapStyle = useMemo(() => {
-    const styles = {
-      light: 'mapbox://styles/mapbox/navigation-day-v1',
-      dark: 'mapbox://styles/mapbox/dark-v11',
+    const maptilerKey = env.NEXT_PUBLIC_MAPTILER_API_KEY
+
+    if (maptilerKey) {
+      // Use MapTiler styles (better quality, supports dark mode)
+      const styleName = resolvedTheme === 'dark' ? 'dark-v2' : 'streets-v2'
+      return `https://api.maptiler.com/maps/${styleName}/style.json?key=${maptilerKey}`
     }
-    return styles[resolvedTheme as keyof typeof styles] || styles.light
+
+    // Fallback to demo tiles (no API key required)
+    return 'https://demotiles.maplibre.org/style.json'
   }, [resolvedTheme])
 
   // Validate coordinates - check if they are valid numbers
@@ -77,40 +61,20 @@ export function LocationMap({
   const safeLongitude = isValidLongitude ? longitude : 0
   const defaultZoom = hasValidCoordinates ? (zoom ?? 14) : 2
 
-  if (!mapboxToken) {
-    return (
-      <div
-        className='flex items-center justify-center rounded-md bg-muted'
-        style={{ width, height }}
-      >
-        <div className='p-4 text-center'>
-          <p className='mb-1 font-medium text-muted-foreground text-sm'>
-            Map unavailable
-          </p>
-          <p className='text-muted-foreground text-xs'>
-            Mapbox token not configured
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <MapGL
-      mapLib={mapboxgl}
+      mapLib={maplibregl}
       initialViewState={{
         longitude: safeLongitude,
         latitude: safeLatitude,
         zoom: defaultZoom,
       }}
       mapStyle={mapStyle}
-      mapboxAccessToken={mapboxToken}
-      ref={mapRef}
       style={{ width, height }}
       onError={(e) => {
-        // Suppress Mapbox errors in console (e.g., font loading, style loading)
+        // Suppress map errors in console (e.g., font loading, style loading)
         // These are often non-critical and can be ignored
-        console.warn('Mapbox warning (non-critical):', e.error?.message || e)
+        console.warn('Map warning (non-critical):', e.error?.message || e)
       }}
       // biome-ignore lint/suspicious/noExplicitAny: need to be any
       onClick={(e: any) => {

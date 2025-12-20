@@ -60,7 +60,9 @@ services:
       DATABASE_URL: "postgresql://postgres:postgres_dev_password@postgres:5432/camlife_dev"
       SKIP_ENV_VALIDATION: "true"
       # 开发环境可以设置一些默认值，实际值从 .env.local 读取
-      NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: "${NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN:-}"
+      # 注意：Mapbox 已替换为 MapLibre（免费开源），无需配置 API Token
+      # MapTiler API Key（可选，用于更好的地图样式）
+      NEXT_PUBLIC_MAPTILER_API_KEY: "${NEXT_PUBLIC_MAPTILER_API_KEY:-}"
       NEXT_PUBLIC_UMAMI_ANALYTICS_ID: "${NEXT_PUBLIC_UMAMI_ANALYTICS_ID:-}"
       NEXT_PUBLIC_UMAMI_ANALYTICS_JS: "${NEXT_PUBLIC_UMAMI_ANALYTICS_JS:-}"
     env_file:

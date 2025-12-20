@@ -1,54 +1,26 @@
-import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding'
 import { ADDRESS_LANGUAGE } from '@/constants'
-import { env } from '@/env'
 import type { ImageLocation } from '@/types'
 
-// Lazy initialization of geocoding client to avoid errors when token is not configured
-let geocodingClient: ReturnType<typeof mbxGeocoding> | null = null
+// Nominatim API endpoint (OpenStreetMap's free geocoding service)
+const NOMINATIM_API_URL = 'https://nominatim.openstreetmap.org/reverse'
 
-function getGeocodingClient() {
-  if (!geocodingClient) {
-    const token = env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-    if (!token) {
-      console.warn(
-        'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN is not configured. Location features will be disabled.',
-      )
-      return null
-    }
-    try {
-      geocodingClient = mbxGeocoding({
-        accessToken: token,
-      })
-    } catch (error) {
-      console.error('Failed to initialize Mapbox geocoding client:', error)
-      return null
-    }
-  }
-  return geocodingClient
-}
+// User-Agent is required by Nominatim usage policy
+const USER_AGENT = 'CamLife/1.0 (https://github.com/your-repo/camlife)'
 
 /**
- * Get location information using Mapbox Geocoding SDK
+ * Get location information using Nominatim (OpenStreetMap's free geocoding service)
  * @param latitude Latitude coordinate
  * @param longitude Longitude coordinate
- * @param level Address level, defaults to 0
+ * @param level Address level, defaults to 0 (not used with Nominatim, kept for compatibility)
  * @param language Language code for address, defaults to ADDRESS_LANGUAGE constant
  * @returns Promise<ImageLocation> Location information
  */
 export async function getLocationFromCoordinates(
   latitude: number,
   longitude: number,
-  level = 0,
+  _level = 0,
   language = ADDRESS_LANGUAGE,
 ): Promise<ImageLocation> {
-  const client = getGeocodingClient()
-  if (!client) {
-    console.warn(
-      'Mapbox token not configured or invalid. Skipping location lookup.',
-    )
-    return {}
-  }
-
   // Validate coordinates
   if (
     typeof latitude !== 'number' ||
@@ -61,70 +33,101 @@ export async function getLocationFromCoordinates(
   }
 
   try {
-    const response = await client
-      .reverseGeocode({
-        query: [longitude, latitude],
-        language: [language],
-        types: [
-          'country',
-          'region',
-          'district',
-          'place',
-          'locality',
-          'neighborhood',
-          'address',
-        ],
-      })
-      .send()
+    // Build Nominatim API URL
+    const params = new URLSearchParams({
+      lat: latitude.toString(),
+      lon: longitude.toString(),
+      format: 'json',
+      addressdetails: '1',
+      'accept-language': language,
+      zoom: '18', // Maximum detail level
+    })
 
-    const features = response.body.features || []
+    const url = `${NOMINATIM_API_URL}?${params.toString()}`
 
-    if (features.length === 0) {
+    // Fetch with User-Agent header (required by Nominatim usage policy)
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': USER_AGENT,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(
+        `Nominatim API error: ${response.status} ${response.statusText}`,
+      )
+    }
+
+    const data = await response.json()
+
+    if (!data || !data.address) {
       return {}
     }
 
-    // Parse geographic information - much simpler approach
+    const address = data.address
     const locationData: ImageLocation = {}
 
-    // Get full address and formatted place name
-    if (features[0]) {
-      locationData.fullAddress = features[0].place_name
-      locationData.placeFormatted =
-        features[level]?.place_name || features[0].place_name
+    // Extract country information
+    if (address.country) {
+      locationData.country = address.country
+    }
+    if (address.country_code) {
+      locationData.countryCode = address.country_code.toUpperCase()
     }
 
-    // Create a map of all features by type for easy lookup
-    const featureMap = new Map()
-    features.forEach((feature) => {
-      const type = feature.place_type?.[0] // Get the first place_type
-      if (type) {
-        featureMap.set(type, feature)
+    // Extract region/state information
+    if (address.state) {
+      locationData.region = address.state
+    } else if (address.province) {
+      locationData.region = address.province
+    }
+
+    // Extract city information
+    if (address.city) {
+      locationData.city = address.city
+    } else if (address.town) {
+      locationData.city = address.town
+    } else if (address.village) {
+      locationData.city = address.village
+    } else if (address.municipality) {
+      locationData.city = address.municipality
+    }
+
+    // Extract district/neighborhood information
+    if (address.suburb) {
+      locationData.district = address.suburb
+    } else if (address.neighbourhood) {
+      locationData.district = address.neighbourhood
+    } else if (address.district) {
+      locationData.district = address.district
+    }
+
+    // Build full address from display_name or address components
+    if (data.display_name) {
+      locationData.fullAddress = data.display_name
+      locationData.placeFormatted = data.display_name
+    } else {
+      // Fallback: build address from components
+      const addressParts: string[] = []
+      if (address.house_number && address.road) {
+        addressParts.push(`${address.house_number} ${address.road}`)
+      } else if (address.road) {
+        addressParts.push(address.road)
       }
-    })
-
-    // Extract location data based on feature types
-    const countryFeature = featureMap.get('country')
-    if (countryFeature) {
-      locationData.country = countryFeature.text
-      locationData.countryCode = countryFeature.properties?.short_code
-    }
-
-    const regionFeature = featureMap.get('region')
-    if (regionFeature) {
-      locationData.region = regionFeature.text
-    }
-
-    // City can be either 'place' or 'locality'
-    const cityFeature = featureMap.get('locality') || featureMap.get('place')
-    if (cityFeature) {
-      locationData.city = cityFeature.text
-    }
-
-    // District can be 'district' or 'neighborhood'
-    const districtFeature =
-      featureMap.get('district') || featureMap.get('neighborhood')
-    if (districtFeature) {
-      locationData.district = districtFeature.text
+      if (locationData.district) {
+        addressParts.push(locationData.district)
+      }
+      if (locationData.city) {
+        addressParts.push(locationData.city)
+      }
+      if (locationData.region) {
+        addressParts.push(locationData.region)
+      }
+      if (locationData.country) {
+        addressParts.push(locationData.country)
+      }
+      locationData.fullAddress = addressParts.join(', ')
+      locationData.placeFormatted = locationData.fullAddress
     }
 
     return locationData
@@ -132,17 +135,7 @@ export async function getLocationFromCoordinates(
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error'
 
-    // Handle specific Mapbox errors
-    if (
-      errorMessage.includes('Invalid token') ||
-      errorMessage.includes('Unauthorized')
-    ) {
-      console.warn(
-        'Mapbox token is invalid or expired. Please check NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in .env.local',
-      )
-    } else {
-      console.error('Error fetching location data:', errorMessage)
-    }
+    console.error('Error fetching location data from Nominatim:', errorMessage)
 
     return {}
   }

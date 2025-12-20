@@ -15,6 +15,8 @@ const withBundleAnalyzer = bundleAnalyzer({
 /** @type {import("next").NextConfig} */
 const config = {
   output: 'standalone',
+  // Transpile maplibre-gl for Next.js
+  transpilePackages: ['maplibre-gl'],
   turbopack: {
     rules: {
       '*.svg': {
@@ -22,6 +24,18 @@ const config = {
         as: '*.js',
       },
     },
+  },
+  webpack: (config, { isServer }) => {
+    // Fix for maplibre-gl in Next.js
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      }
+    }
+    return config
   },
   images: {
     unoptimized: true,

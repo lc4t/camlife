@@ -250,16 +250,6 @@ export function PhotoInfo() {
       return
     }
 
-    // Check if Mapbox token is configured
-    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-    if (!mapboxToken) {
-      toast.error(
-        t('common.mapbox-not-configured') ||
-          'Mapbox token is not configured. Please set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in .env.local',
-      )
-      return
-    }
-
     setIsReverseGeocoding(true)
     try {
       const location = await getLocationFromCoordinates(
@@ -273,7 +263,7 @@ export function PhotoInfo() {
       if (Object.keys(location).length === 0) {
         toast.error(
           t('gallery.get-location-failed') ||
-            'Failed to get location information. Please check your Mapbox token configuration.',
+            'Failed to get location information. Please try again later.',
         )
         return
       }
@@ -284,19 +274,10 @@ export function PhotoInfo() {
       )
     } catch (e) {
       console.error('reverse geocode failed', e)
-      const errorMessage = e instanceof Error ? e.message : 'Unknown error'
-
-      if (
-        errorMessage.includes('Invalid token') ||
-        errorMessage.includes('Unauthorized')
-      ) {
-        toast.error(
-          t('common.mapbox-token-invalid') ||
-            'Mapbox token is invalid. Please check NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in .env.local',
-        )
-      } else {
-        toast.error(t('gallery.get-location-failed'))
-      }
+      toast.error(
+        t('gallery.get-location-failed') ||
+          'Failed to get location information. Please try again later.',
+      )
     } finally {
       setIsReverseGeocoding(false)
     }

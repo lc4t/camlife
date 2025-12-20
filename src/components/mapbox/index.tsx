@@ -1,21 +1,19 @@
 'use client'
 
-import 'mapbox-gl/dist/mapbox-gl.css'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import '@/styles/mapbox.css'
 
-import MapboxLanguage from '@mapbox/mapbox-gl-language'
-import mapboxgl from 'mapbox-gl'
+import maplibregl from 'maplibre-gl'
 import Image from 'next/image'
-import { useLocale } from 'next-intl'
 import { useTheme } from 'next-themes'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   GeolocateControl,
-  Map as MapboxMap,
+  Map as MapLibreMap,
   type MapRef,
   NavigationControl,
   Popup,
-} from 'react-map-gl/mapbox'
+} from 'react-map-gl/maplibre'
 import { MapPoints } from '@/components/mapbox/map-points'
 import { MapTools } from '@/components/mapbox/toolbar'
 import { env } from '@/env'
@@ -24,18 +22,13 @@ import { api } from '@/trpc/react'
 import type { PopupInfo } from '@/types'
 
 interface MapBoxProps {
-  lang?: string | null
   hideControls: boolean
 }
 
-export default function MapBox({ hideControls, lang }: MapBoxProps) {
+export default function MapBox({ hideControls }: MapBoxProps) {
   const { resolvedTheme } = useTheme()
 
   const isMobile = useIsMobile()
-
-  const locale = useLocale()
-
-  const mapboxToken = env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 
   const { data: coordinates } = api.photo.getAllCoordinates.useQuery()
 
@@ -44,13 +37,22 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
   const [mapLoaded, setMapLoaded] = useState(false)
   const [isGlobe, setIsGlobe] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const mapInstanceRef = useRef<mapboxgl.Map | null>(null)
+  const mapInstanceRef = useRef<maplibregl.Map | null>(null)
 
-  // map style
+  // map style - using MapTiler if API key is configured, otherwise use demo tiles
   const mapStyle = useMemo(() => {
-    return resolvedTheme === 'dark'
-      ? 'mapbox://styles/sunguoqi/cm1xkp4hc000i01nthigphlmh'
-      : 'mapbox://styles/sunguoqi/cm1xkfhra014901qr0td1a0mz'
+    const maptilerKey = env.NEXT_PUBLIC_MAPTILER_API_KEY
+
+    if (maptilerKey) {
+      // Use MapTiler styles (better quality, supports dark mode)
+      // Available styles: openstreetmap, basic, streets, outdoors, satellite
+      // See: https://docs.maptiler.com/cloud/api/maps/
+      const styleName = resolvedTheme === 'dark' ? 'dark-v2' : 'streets-v2'
+      return `https://api.maptiler.com/maps/${styleName}/style.json?key=${maptilerKey}`
+    }
+
+    // Fallback to demo tiles (no API key required)
+    return 'https://demotiles.maplibre.org/style.json'
   }, [resolvedTheme])
 
   // Create initial view state with mobile-specific zoom
@@ -100,27 +102,14 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
   }, [coordinates])
 
   // map ref
-  const mapRef = useCallback(
-    (ref: MapRef) => {
-      if (ref) {
-        mapInstanceRef.current = ref.getMap()
-        if (lang) {
-          const language = lang === 'zh' ? 'zh-Hans' : 'en'
-          ref
-            .getMap()
-            .addControl(new MapboxLanguage({ defaultLanguage: language }))
-        } else if (locale === 'zh') {
-          ref
-            .getMap()
-            .addControl(new MapboxLanguage({ defaultLanguage: 'zh-Hans' }))
-        }
-        mapInstanceRef.current.on('load', () => {
-          setMapLoaded(true)
-        })
-      }
-    },
-    [locale, lang],
-  )
+  const mapRef = useCallback((ref: MapRef) => {
+    if (ref) {
+      mapInstanceRef.current = ref.getMap()
+      mapInstanceRef.current.on('load', () => {
+        setMapLoaded(true)
+      })
+    }
+  }, [])
 
   /**
    * Rotate map
@@ -174,6 +163,8 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
 
     const easing = (t: number) => t * (2 - t)
 
+    // Note: Projection is controlled via react-map-gl's projection prop
+    // We just toggle the state and let the component re-render
     if (isGlobe) {
       map.easeTo({
         ...currentView,
@@ -182,17 +173,10 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
       })
 
       setTimeout(() => {
-        map.setProjection({ name: 'mercator' })
-        map.easeTo({
-          ...currentView,
-          duration: 400,
-          easing,
-        })
         setIsGlobe(false)
         setTimeout(() => setIsTransitioning(false), 400)
       }, 300)
     } else {
-      map.setProjection({ name: 'globe' })
       map.easeTo({
         ...currentView,
         duration: 600,
@@ -210,53 +194,44 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
    * @returns void
    * @description Set popup info when point is clicked
    */
-  const handlePointClick = useCallback((event: mapboxgl.MapMouseEvent) => {
-    setIsRotating(false)
+  const handlePointClick = useCallback(
+    // biome-ignore lint/suspicious/noExplicitAny: react-map-gl event type
+    (event: any) => {
+      setIsRotating(false)
 
-    const feature = event.features?.[0]
-    if (!feature || feature.geometry.type !== 'Point') {
-      setPopupInfo(null)
-      return
-    }
-
-    const [longitude, latitude] = feature.geometry.coordinates as [
-      number,
-      number,
-    ]
-    const { url, compressedUrl, blurData, width, height } =
-      feature.properties as {
-        url: string
-        compressedUrl: string | null
-        blurData: string
-        width: number
-        height: number
+      // Get features from the event
+      const features = event.features || []
+      const feature = features[0]
+      if (!feature || feature.geometry.type !== 'Point') {
+        setPopupInfo(null)
+        return
       }
 
-    setPopupInfo({
-      longitude,
-      latitude,
-      url,
-      compressedUrl,
-      blurData,
-      width,
-      height,
-    })
-  }, [])
+      const [longitude, latitude] = feature.geometry.coordinates as [
+        number,
+        number,
+      ]
+      const { url, compressedUrl, blurData, width, height } =
+        feature.properties as {
+          url: string
+          compressedUrl: string | null
+          blurData: string
+          width: number
+          height: number
+        }
 
-  if (!mapboxToken) {
-    return (
-      <div className='flex h-screen w-screen items-center justify-center bg-background'>
-        <div className='text-center'>
-          <p className='mb-2 font-medium text-lg text-muted-foreground'>
-            Mapbox token not configured
-          </p>
-          <p className='text-muted-foreground text-sm'>
-            Please set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in your .env.local file
-          </p>
-        </div>
-      </div>
-    )
-  }
+      setPopupInfo({
+        longitude,
+        latitude,
+        url,
+        compressedUrl,
+        blurData,
+        width,
+        height,
+      })
+    },
+    [],
+  )
 
   return (
     <>
@@ -269,16 +244,15 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
           isTransitioning={isTransitioning}
         />
       )}
-      <MapboxMap
-        mapLib={mapboxgl}
+      <MapLibreMap
+        mapLib={maplibregl}
         initialViewState={initialViewState}
         style={{ width: '100vw', height: '100vh' }}
         mapStyle={mapStyle}
-        mapboxAccessToken={mapboxToken}
         ref={mapRef}
         interactiveLayerIds={['point-hitbox', 'point']}
         onClick={handlePointClick}
-        projection={{ name: isGlobe ? 'globe' : 'mercator' }}
+        projection={isGlobe ? 'globe' : 'mercator'}
         minZoom={isMobile ? -2 : undefined}
         maxZoom={isMobile ? 3 : undefined}
       >
@@ -324,7 +298,7 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
             />
           </>
         )}
-      </MapboxMap>
+      </MapLibreMap>
     </>
   )
 }

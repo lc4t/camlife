@@ -10,12 +10,6 @@ const DynamicMap = dynamic(() => import('@/components/mapbox'), {
 export default function MapPage() {
   const params = useSearchParams()
   const hideControls = params.get('hide_controls') === 'true'
-  const lang = params?.get('lang')
 
-  return (
-    <DynamicMap
-      hideControls={hideControls}
-      lang={lang}
-    />
-  )
+  return <DynamicMap hideControls={hideControls} />
 }

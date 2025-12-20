@@ -290,7 +290,8 @@
     "using-current-location": "Getting current location...",
     "fill-address-from-coordinates": "Fill address from coordinates",
     "filling-address": "Filling address...",
-    "click-map-to-set-location": "Click map or drag marker to set location"
+    "click-map-to-set-location": "Click map or drag marker to set location",
+    "location-updated": "Location information updated"
   },
   "settings": {
     "settings": "Settings",

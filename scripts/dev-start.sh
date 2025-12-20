@@ -19,7 +19,8 @@ if [ ! -f .env.local ]; then
     if [ -f env.local.example ]; then
         cp env.local.example .env.local
         echo -e "${GREEN}✓ 已创建 .env.local，请编辑并填入必要的配置${NC}"
-        echo -e "${YELLOW}至少需要配置 NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN${NC}\n"
+        echo -e "${YELLOW}至少需要配置存储服务（CLOUDFLARE_R2_* 或 AWS_S3_*）${NC}"
+        echo -e "${YELLOW}注意：地图功能使用 MapLibre（免费开源），无需配置 API Token${NC}\n"
     else
         echo -e "${RED}✗ 未找到 env.local.example 文件${NC}"
         exit 1

@@ -27,7 +27,7 @@
 cp env.local.example .env.local
 ```
 
-然后编辑 `.env.local` 文件，填入必要的配置（至少需要 `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`）。
+然后编辑 `.env.local` 文件，填入必要的配置（主要是存储服务配置，地图功能无需配置）。
 
 #### 2. 启动开发环境
 

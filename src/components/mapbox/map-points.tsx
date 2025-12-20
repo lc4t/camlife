@@ -1,6 +1,6 @@
 'use client'
 
-import { Layer, Source } from 'react-map-gl/mapbox'
+import { Layer, Source } from 'react-map-gl/maplibre'
 
 interface MapPointsProps {
   geojsonData: {

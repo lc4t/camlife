@@ -23,6 +23,8 @@ export const env = createEnv({
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: z.string(),
     CLOUDFLARE_R2_PREFIX: z.string().default('camlife'),
     CLOUDFLARE_R2_PUBLIC_URL: z.string().url(),
+    // Note: Mapbox has been replaced with MapLibre (free and open-source)
+    // No API token is required for map rendering or geocoding
   },
 
   /**
@@ -31,8 +33,9 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    // Mapbox token is optional in development, required in production
-    NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: z.string().optional(),
+    // MapTiler API key (optional, for better map styles)
+    // Get free key at: https://cloud.maptiler.com/account/keys/
+    NEXT_PUBLIC_MAPTILER_API_KEY: z.string().optional(),
     NEXT_PUBLIC_UMAMI_ANALYTICS_ID: z.string().optional(),
     NEXT_PUBLIC_UMAMI_ANALYTICS_JS: z.string().optional(),
   },
@@ -55,8 +58,7 @@ export const env = createEnv({
       process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
     CLOUDFLARE_R2_PREFIX: process.env.CLOUDFLARE_R2_PREFIX,
     CLOUDFLARE_R2_PUBLIC_URL: process.env.CLOUDFLARE_R2_PUBLIC_URL,
-    NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN:
-      process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
+    NEXT_PUBLIC_MAPTILER_API_KEY: process.env.NEXT_PUBLIC_MAPTILER_API_KEY,
     NEXT_PUBLIC_UMAMI_ANALYTICS_ID: process.env.NEXT_PUBLIC_UMAMI_ANALYTICS_ID,
     NEXT_PUBLIC_UMAMI_ANALYTICS_JS: process.env.NEXT_PUBLIC_UMAMI_ANALYTICS_JS,
   },
