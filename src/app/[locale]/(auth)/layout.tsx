@@ -18,7 +18,7 @@ export default function AuthLayout({
       </div>
 
       {/* light background */}
-      <div className='-z-10 absolute inset-0 dark:hidden'>
+      <div className='absolute inset-0 -z-10 dark:hidden'>
         <GridPattern
           width={20}
           height={20}
@@ -29,7 +29,7 @@ export default function AuthLayout({
       </div>
 
       {/* dark background */}
-      <div className='-z-10 absolute inset-0 hidden dark:block'>
+      <div className='absolute inset-0 -z-10 hidden dark:block'>
         <EtherealShadow
           color='rgba(128, 128, 128, 1)'
           animation={{ scale: 100, speed: 90 }}

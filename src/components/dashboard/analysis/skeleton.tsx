@@ -8,6 +8,10 @@ interface DashboardSkeletonProps {
 }
 
 export function DashboardSkeleton({ className }: DashboardSkeletonProps) {
+  // Use fixed heights to avoid hydration mismatch
+  // These values are consistent between server and client
+  const barHeights = [35, 29, 101, 30, 61, 53, 37, 107] as const
+
   return (
     <div>
       <div className='mt-4 flex items-center justify-center px-6'>
@@ -218,11 +222,11 @@ export function DashboardSkeleton({ className }: DashboardSkeletonProps) {
               <div className='h-[300px] w-full'>
                 <div className='space-y-4'>
                   <div className='flex h-48 items-end justify-between px-4'>
-                    {Array.from({ length: 8 }).map((_, index) => (
+                    {barHeights.map((height: number, index: number) => (
                       <Skeleton
                         key={index}
                         className='w-8 rounded-t-sm'
-                        style={{ height: `${Math.random() * 100 + 20}%` }}
+                        style={{ height: `${height}%` }}
                       />
                     ))}
                   </div>

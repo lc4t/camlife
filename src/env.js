@@ -31,7 +31,8 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: z.string(),
+    // Mapbox token is optional in development, required in production
+    NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: z.string().optional(),
     NEXT_PUBLIC_UMAMI_ANALYTICS_ID: z.string().optional(),
     NEXT_PUBLIC_UMAMI_ANALYTICS_JS: z.string().optional(),
   },

@@ -1,0 +1,96 @@
+services:
+  # PostgreSQL Database for Development
+  postgres:
+    image: postgres:16-alpine
+    container_name: camlife-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: camlife_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - camlife_dev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    command: postgres -c log_statement=all -c log_destination=stderr
+
+  # Database Migration Service
+  # 迁移服务会在 web 服务启动前自动运行
+  migration:
+    build:
+      context: .
+      dockerfile: docker/migrations/Dockerfile
+    image: camlife-migration-dev
+    container_name: camlife-migration-dev
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres_dev_password@postgres:5432/camlife_dev"
+      SKIP_ENV_VALIDATION: "true"
+    env_file:
+      - .env.local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - camlife_dev_network
+    restart: "no"
+    # 如果需要手动运行迁移，可以使用 profile
+    # profiles:
+    #   - migration
+
+  # Next.js Web Application (Development Mode)
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile.dev
+    image: camlife-web-dev
+    container_name: camlife-web-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: "postgresql://postgres:postgres_dev_password@postgres:5432/camlife_dev"
+      SKIP_ENV_VALIDATION: "true"
+      # 开发环境可以设置一些默认值，实际值从 .env.local 读取
+      NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: "${NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN:-}"
+      NEXT_PUBLIC_UMAMI_ANALYTICS_ID: "${NEXT_PUBLIC_UMAMI_ANALYTICS_ID:-}"
+      NEXT_PUBLIC_UMAMI_ANALYTICS_JS: "${NEXT_PUBLIC_UMAMI_ANALYTICS_JS:-}"
+    env_file:
+      - .env.local
+    volumes:
+      # 挂载源代码以实现热重载
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    networks:
+      - camlife_dev_network
+    # DNS configuration for better network connectivity
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    stdin_open: true
+    tty: true
+    command: bun run dev
+
+volumes:
+  postgres_dev_data:
+    name: camlife_postgres_dev_data
+
+networks:
+  camlife_dev_network:
+    name: camlife_dev_network
+    driver: bridge
+

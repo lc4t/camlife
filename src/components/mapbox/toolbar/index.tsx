@@ -33,7 +33,7 @@ export function MapTools({
 
   if (isMobile) {
     return (
-      <div className='-translate-x-1/2 fixed bottom-4 left-1/2 z-[49] h-16 w-auto transform'>
+      <div className='fixed bottom-4 left-1/2 z-[49] h-16 w-auto -translate-x-1/2 transform'>
         <div className='flex items-center justify-center gap-4 rounded-full bg-white/20 px-6 py-3 shadow-lg backdrop-blur-md transition-all duration-300 dark:bg-black/20'>
           <ProjectionToggle
             isGlobe={isGlobe}

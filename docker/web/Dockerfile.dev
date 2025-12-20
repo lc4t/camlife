@@ -1,0 +1,27 @@
+# Development Dockerfile for Next.js with Bun
+# This Dockerfile is optimized for development with hot reload
+
+FROM oven/bun:1 AS base
+
+WORKDIR /app
+
+# Install dependencies
+# 开发环境不使用 --frozen-lockfile，允许更新 lockfile
+COPY package.json bun.lock* ./
+RUN bun install
+
+# Copy the rest of the application
+COPY . .
+
+# Expose the port
+EXPOSE 3000
+
+# Set environment variables for development
+ENV NODE_ENV=development
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+ENV SKIP_ENV_VALIDATION=true
+
+# Run the development server
+CMD ["bun", "run", "dev"]
+

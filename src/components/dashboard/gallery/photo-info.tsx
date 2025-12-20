@@ -97,9 +97,12 @@ export function PhotoInfo() {
   }
 
   const handleCancel = async () => {
-    if (triggerType === 'file-upload') {
-      await deleteFile({ key: photoInfo?.fileName! })
-      await deleteFile({ key: getCompressedFileName(photoInfo?.fileName!)! })
+    if (triggerType === 'file-upload' && photoInfo?.fileName) {
+      await deleteFile({ key: photoInfo.fileName })
+      const compressedFileName = getCompressedFileName(photoInfo.fileName)
+      if (compressedFileName) {
+        await deleteFile({ key: compressedFileName })
+      }
     }
 
     setDialogOpen(false)
@@ -204,20 +207,36 @@ export function PhotoInfo() {
         setPhotoInfo({ ...photoInfo, latitude, longitude })
         setIsGeoLoading(false)
       },
-      (err) => {
-        console.error('geolocation error', err)
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            toast.error(t('common.user-denied-geolocation'))
-            break
-          case err.POSITION_UNAVAILABLE:
-            toast.error(t('common.location-information-unavailable'))
-            break
-          case err.TIMEOUT:
-            toast.error(t('common.location-request-timed-out'))
-            break
-          default:
-            toast.error(t('common.unknown-error-occurred'))
+      (err: GeolocationPositionError) => {
+        // Log error details for debugging
+        const errorCode = err?.code ?? 'unknown'
+        const errorMessage = err?.message ?? 'Unknown geolocation error'
+        console.warn('Geolocation error:', {
+          code: errorCode,
+          message: errorMessage,
+          errorType: err?.constructor?.name || 'GeolocationPositionError',
+        })
+
+        // Handle different error codes
+        if (err?.code !== undefined) {
+          switch (err.code) {
+            case GeolocationPositionError.PERMISSION_DENIED:
+              toast.error(t('common.user-denied-geolocation'))
+              break
+            case GeolocationPositionError.POSITION_UNAVAILABLE:
+              toast.error(t('common.location-information-unavailable'))
+              break
+            case GeolocationPositionError.TIMEOUT:
+              toast.error(t('common.location-request-timed-out'))
+              break
+            default:
+              console.warn('Unknown geolocation error code:', err.code)
+              toast.error(t('common.unknown-error-occurred'))
+          }
+        } else {
+          // Fallback if error code is not available
+          console.warn('Geolocation error without code:', err)
+          toast.error(t('common.location-information-unavailable'))
         }
         setIsGeoLoading(false)
       },
@@ -230,6 +249,17 @@ export function PhotoInfo() {
       toast.error(t('photo.location-not-available'))
       return
     }
+
+    // Check if Mapbox token is configured
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+    if (!mapboxToken) {
+      toast.error(
+        t('common.mapbox-not-configured') ||
+          'Mapbox token is not configured. Please set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in .env.local',
+      )
+      return
+    }
+
     setIsReverseGeocoding(true)
     try {
       const location = await getLocationFromCoordinates(
@@ -238,10 +268,35 @@ export function PhotoInfo() {
         3,
         addressLanguage,
       )
+
+      // Check if location data was retrieved
+      if (Object.keys(location).length === 0) {
+        toast.error(
+          t('gallery.get-location-failed') ||
+            'Failed to get location information. Please check your Mapbox token configuration.',
+        )
+        return
+      }
+
       setPhotoInfo({ ...photoInfo, ...location })
+      toast.success(
+        t('photo.location-updated') || 'Location information updated',
+      )
     } catch (e) {
       console.error('reverse geocode failed', e)
-      toast.error(t('gallery.get-location-failed'))
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error'
+
+      if (
+        errorMessage.includes('Invalid token') ||
+        errorMessage.includes('Unauthorized')
+      ) {
+        toast.error(
+          t('common.mapbox-token-invalid') ||
+            'Mapbox token is invalid. Please check NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in .env.local',
+        )
+      } else {
+        toast.error(t('gallery.get-location-failed'))
+      }
     } finally {
       setIsReverseGeocoding(false)
     }

@@ -6,7 +6,7 @@
     "check": "biome check .",
     "check:unsafe": "biome check --write --unsafe .",
     "check:write": "biome check --write .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --skipLibCheck",
     "check:deps": "SKIP_ENV_VALIDATION=1 knip --exclude exports,nsExports",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

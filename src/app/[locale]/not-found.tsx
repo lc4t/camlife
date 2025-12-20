@@ -19,7 +19,7 @@ export default function NotFound() {
         )}
       />
       <Spotlight
-        className='-top-40 md:-top-20 left-0 md:left-60'
+        className='-top-40 left-0 md:-top-20 md:left-60'
         fill='white'
       />
       <div className='flex w-full flex-col items-center justify-center gap-20 px-4'>

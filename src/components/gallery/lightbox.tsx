@@ -256,7 +256,7 @@ export function PhotoLightbox({
               }}
               disabled={currentIndex === 0}
               className={cn(
-                '-translate-y-1/2 absolute top-1/2 left-4 z-50 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200',
+                'absolute top-1/2 left-4 z-50 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full transition-all duration-200',
                 'cursor-pointer border backdrop-blur-md hover:scale-110 active:scale-95',
                 currentIndex === 0 && 'cursor-not-allowed opacity-50',
                 resolvedTheme === 'dark'
@@ -278,7 +278,7 @@ export function PhotoLightbox({
               }}
               disabled={currentIndex === allPhotos.length - 1}
               className={cn(
-                '-translate-y-1/2 absolute top-1/2 right-4 z-50 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200',
+                'absolute top-1/2 right-4 z-50 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full transition-all duration-200',
                 'cursor-pointer border backdrop-blur-md hover:scale-110 active:scale-95',
                 currentIndex === allPhotos.length - 1 &&
                   'cursor-not-allowed opacity-50',

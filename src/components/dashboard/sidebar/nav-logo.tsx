@@ -14,7 +14,7 @@ export function NavLogo() {
             'transition-all duration-300 ease-in-out',
             open
               ? 'translate-x-0 scale-100 opacity-100'
-              : '-translate-x-2 absolute scale-75 opacity-0',
+              : 'absolute -translate-x-2 scale-75 opacity-0',
           )}
         >
           <Logo className='size-10' />

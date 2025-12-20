@@ -16,7 +16,7 @@ import { useConfetti } from '@/hooks/use-confetti'
 import { useAppSettings } from '@/hooks/use-settings'
 import { formatExifDateTime } from '@/lib/format'
 import { generateBlurData, getLocationFromCoordinates } from '@/lib/image'
-import { uploadFileWithProgress } from '@/lib/storage'
+import { uploadFileViaProxy, uploadFileWithProgress } from '@/lib/storage'
 import { cn, getCompressedFileName } from '@/lib/utils'
 import { useCommonStore } from '@/stores/common'
 import { usePhotoStore } from '@/stores/photo'
@@ -57,8 +57,8 @@ export function FileUpload() {
         handleFileChange(acceptedFiles[0]!)
       }
     },
-    onDropRejected: (error) => {
-      console.log(error)
+    onDropRejected: () => {
+      // File rejected by dropzone
     },
   })
 
@@ -73,7 +73,6 @@ export function FileUpload() {
     const fileExt = name.substring(name.lastIndexOf('.'))
     const fileName = `${fileNameWithoutExt}_${randomId}${fileExt}`
 
-    console.info('--- 1. validate file size ---')
     setStep('upload')
     if (fileSize > imageSizeLimit) {
       toast.error(
@@ -89,88 +88,126 @@ export function FileUpload() {
     }
 
     try {
-      console.info('--- 2. get presigned url and upload file ---')
-      const { signedUrl, publicUrl } = await getPresignedUrl({
-        fileName,
-        fileType,
-      })
-      await uploadFileWithProgress(file, signedUrl, setProgress)
+      // Use server-side proxy for local development (bypasses CORS)
+      // In production, you can use direct upload with proper CORS configuration
+      // Default: use proxy unless explicitly disabled
+      // - Local dev: proxy by default (no CORS needed)
+      // - Production: direct upload by default (needs CORS), or set NEXT_PUBLIC_USE_UPLOAD_PROXY=true to use proxy
+      const useProxy = process.env.NEXT_PUBLIC_USE_UPLOAD_PROXY !== 'false'
+      let publicUrl: string
 
-      console.info('--- 3. compress file and upload if enabled ---')
+      if (useProxy) {
+        setStep('upload')
+        const result = await uploadFileViaProxy(file, fileName, setProgress)
+        publicUrl = result.url
+      } else {
+        const { signedUrl, publicUrl: presignedPublicUrl } =
+          await getPresignedUrl({
+            fileName,
+            fileType,
+          })
+
+        await uploadFileWithProgress(file, signedUrl, setProgress)
+        publicUrl = presignedPublicUrl
+      }
+
       let compressedData = { compressedUrl: '', compressedSize: 0 }
       if (enableFileCompression) {
         setStep('compress')
         compressedData = await new Promise<{
           compressedUrl: string
           compressedSize: number
-        }>((resolve, reject) => {
+        }>((resolve) => {
           new Compressor(file, {
             quality: compressQuality,
             success: async (compressedFile) => {
               try {
+                // Only upload compressed version if it's actually smaller
+                if (compressedFile.size >= file.size) {
+                  resolve({
+                    compressedUrl: '',
+                    compressedSize: 0,
+                  })
+                  return
+                }
+
                 const compressedFileName = getCompressedFileName(fileName)
                 if (!compressedFileName) {
                   throw new Error(t('failed-to-generate-compressed-file-name'))
                 }
 
-                const {
-                  signedUrl: compressedSignedUrl,
-                  publicUrl: compressedPublicUrl,
-                } = await getPresignedUrl({
-                  fileName: compressedFileName,
-                  fileType: compressedFile.type,
-                })
+                if (useProxy) {
+                  // Use proxy for compressed file too
+                  const result = await uploadFileViaProxy(
+                    compressedFile as File,
+                    compressedFileName,
+                    setProgress,
+                  )
+                  resolve({
+                    compressedUrl: result.url,
+                    compressedSize: result.size,
+                  })
+                } else {
+                  const {
+                    signedUrl: compressedSignedUrl,
+                    publicUrl: compressedPublicUrl,
+                  } = await getPresignedUrl({
+                    fileName: compressedFileName,
+                    fileType: compressedFile.type,
+                  })
 
-                await uploadFileWithProgress(
-                  compressedFile as File,
-                  compressedSignedUrl,
-                  setProgress,
-                )
+                  await uploadFileWithProgress(
+                    compressedFile as File,
+                    compressedSignedUrl,
+                    setProgress,
+                  )
 
-                const result = {
-                  compressedUrl: compressedPublicUrl,
-                  compressedSize: compressedFile.size,
+                  const result = {
+                    compressedUrl: compressedPublicUrl,
+                    compressedSize: compressedFile.size,
+                  }
+                  resolve(result)
                 }
-                console.log('compressed data set:', result)
-                resolve(result)
               } catch (error) {
                 console.error('compress file upload failed: ', error)
                 toast.error(t('compress-file-upload-failed'))
-                reject(error)
+                // Don't reject, just resolve with empty data so upload can continue
+                resolve({
+                  compressedUrl: '',
+                  compressedSize: 0,
+                })
               }
             },
             error: (err) => {
-              console.log(err.message)
-              reject(err)
+              console.error('Compression error:', err.message)
+              // Don't reject, just resolve with empty data so upload can continue
+              resolve({
+                compressedUrl: '',
+                compressedSize: 0,
+              })
             },
           })
         })
       }
 
-      console.info('--- 4. generate blur data url ---')
       setStep('blur')
       let blurDataUrl = ''
       try {
         blurDataUrl = await generateBlurData(file, 20) // reduce quality for better performance
-        console.log('blur data generation completed')
       } catch (error) {
         console.error('generate blur data url failed: ', error)
         toast.error(t('generate-blur-data-url-failed'))
       }
 
-      console.info('--- 5. parse exif data ---')
       setStep('exif')
       let exifData: Tags | null = null
       try {
         exifData = await ExifReader.load(file)
-        console.log(exifData)
-        console.log('exif data parsing completed')
       } catch (error) {
         console.error('parse exif data failed: ', error)
         toast.error(t('parse-exif-data-failed'))
       }
 
-      console.info('--- 6. get photo location ---')
       setStep('location')
       let imageLocation: ImageLocation | null = null
       if (exifData?.GPSLatitude && exifData?.GPSLongitude) {
@@ -186,8 +223,6 @@ export function FileUpload() {
           toast.error(t('get-location-failed'))
         }
       }
-
-      console.info('--- 7. set photo info ---')
 
       const newPhotoInfo = {
         // storage
@@ -269,7 +304,49 @@ export function FileUpload() {
       setStep(null)
       setFile(null)
       setProgress(0)
-      console.error(error)
+      console.error('Upload error:', error)
+
+      // Provide user-friendly error message
+      let errorMessage = t('upload-failed') || 'Upload failed'
+
+      if (error instanceof Error) {
+        // Check for specific error types
+        if (error.message.includes('CORS')) {
+          errorMessage =
+            t('upload-cors-error') ||
+            'Upload failed due to CORS configuration. Please check your storage CORS settings.'
+        } else if (
+          error.message.includes('403') ||
+          error.message.includes('Forbidden')
+        ) {
+          errorMessage =
+            t('upload-forbidden-error') ||
+            'Upload forbidden. Please check your storage credentials and permissions.'
+        } else if (
+          error.message.includes('404') ||
+          error.message.includes('Not Found')
+        ) {
+          errorMessage =
+            t('upload-not-found-error') ||
+            'Storage bucket not found. Please check your storage configuration.'
+        } else if (error.message.includes('Network error')) {
+          errorMessage =
+            t('upload-network-error') ||
+            'Network error during upload. Please check your internet connection and storage configuration.'
+        } else if (error.message.includes('Invalid upload URL')) {
+          errorMessage =
+            t('upload-invalid-url-error') ||
+            'Invalid upload URL. Please check your storage configuration in .env.local'
+        } else {
+          // Use the error message if it's informative
+          errorMessage = error.message
+        }
+      }
+
+      toast.error(errorMessage, {
+        duration: 5000,
+      })
+
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }

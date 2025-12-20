@@ -35,6 +35,8 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
 
   const locale = useLocale()
 
+  const mapboxToken = env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+
   const { data: coordinates } = api.photo.getAllCoordinates.useQuery()
 
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null)
@@ -241,6 +243,21 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
     })
   }, [])
 
+  if (!mapboxToken) {
+    return (
+      <div className='flex h-screen w-screen items-center justify-center bg-background'>
+        <div className='text-center'>
+          <p className='mb-2 font-medium text-lg text-muted-foreground'>
+            Mapbox token not configured
+          </p>
+          <p className='text-muted-foreground text-sm'>
+            Please set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in your .env.local file
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       {!hideControls && (
@@ -257,7 +274,7 @@ export default function MapBox({ hideControls, lang }: MapBoxProps) {
         initialViewState={initialViewState}
         style={{ width: '100vw', height: '100vh' }}
         mapStyle={mapStyle}
-        mapboxAccessToken={env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}
+        mapboxAccessToken={mapboxToken}
         ref={mapRef}
         interactiveLayerIds={['point-hitbox', 'point']}
         onClick={handlePointClick}

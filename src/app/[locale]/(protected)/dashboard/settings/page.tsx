@@ -41,9 +41,9 @@ export default function SettingsPage() {
 
   const fetchActiveSessions = useCallback(async () => {
     try {
-      console.log('Fetching active sessions...')
-      const { data: sessions, error } = await listSessions()
-      console.log('Sessions response:', { sessions, error })
+      // Fetching active sessions
+      const { data: sessions } = await listSessions()
+      // Sessions response received
       if (sessions) {
         setActiveSessions(sessions)
       }

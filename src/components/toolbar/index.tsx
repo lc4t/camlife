@@ -95,7 +95,7 @@ function ToolsBarMobile() {
 
   return (
     <div
-      className='-translate-x-1/2 fixed left-1/2 z-[49] h-16 transform transition-all duration-150 ease-out md:hidden'
+      className='fixed left-1/2 z-[49] h-16 -translate-x-1/2 transform transition-all duration-150 ease-out md:hidden'
       style={{
         bottom: `${-scrollPosition}px`,
         opacity: 1 - scrollPosition / 64,

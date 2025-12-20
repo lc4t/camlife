@@ -121,11 +121,11 @@ export const settingsRouter = createTRPCRouter({
       ),
     )
     .mutation(async ({ input }) => {
-      console.log('🔄 Batch updating settings:', input)
+      // Batch updating settings
       const results = []
 
       for (const { key, value } of input) {
-        console.log(`📝 Upserting setting: ${key} = ${value}`)
+        // Upserting setting
 
         // Determine category from key
         const category = key.startsWith('site.')
@@ -157,10 +157,10 @@ export const settingsRouter = createTRPCRouter({
           .returning()
 
         results.push(upsertedSetting[0])
-        console.log(`✅ Setting upserted successfully:`, upsertedSetting[0])
+        // Setting upserted successfully
       }
 
-      console.log('🎉 Batch upsert completed:', results)
+      // Batch upsert completed
       return results
     }),
 

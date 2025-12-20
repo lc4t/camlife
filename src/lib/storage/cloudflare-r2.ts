@@ -52,7 +52,44 @@ export async function getSignedUrlForUpload(
     const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 })
     return signedUrl
   } catch (error) {
-    console.error('Error generating signed URL:', error)
+    console.error('Error generating signed URL:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+      bucket: env.CLOUDFLARE_R2_BUCKET,
+      endpoint: env.CLOUDFLARE_R2_ENDPOINT,
+    })
+
+    // Provide more helpful error messages
+    if (error instanceof Error) {
+      if (
+        error.message.includes('Unable to connect') ||
+        error.message.includes('ENOTFOUND')
+      ) {
+        throw new Error(
+          `Cannot connect to Cloudflare R2 endpoint: ${env.CLOUDFLARE_R2_ENDPOINT}\n` +
+            'Please verify:\n' +
+            '1. Endpoint URL is correct (format: https://<account-id>.r2.cloudflarestorage.com)\n' +
+            '2. Server has internet access\n' +
+            '3. Network/firewall allows connections to Cloudflare',
+        )
+      }
+      if (error.message.includes('InvalidAccessKeyId')) {
+        throw new Error(
+          'Invalid Cloudflare R2 Access Key ID. Please check CLOUDFLARE_R2_ACCESS_KEY_ID in .env.local',
+        )
+      }
+      if (error.message.includes('SignatureDoesNotMatch')) {
+        throw new Error(
+          'Invalid Cloudflare R2 Secret Access Key. Please check CLOUDFLARE_R2_SECRET_ACCESS_KEY in .env.local',
+        )
+      }
+      if (error.message.includes('NoSuchBucket')) {
+        throw new Error(
+          `Bucket "${env.CLOUDFLARE_R2_BUCKET}" not found. Please check CLOUDFLARE_R2_BUCKET in .env.local`,
+        )
+      }
+    }
+
     throw error
   }
 }

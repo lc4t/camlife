@@ -3,9 +3,29 @@ import { ADDRESS_LANGUAGE } from '@/constants'
 import { env } from '@/env'
 import type { ImageLocation } from '@/types'
 
-const geocodingClient = mbxGeocoding({
-  accessToken: env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
-})
+// Lazy initialization of geocoding client to avoid errors when token is not configured
+let geocodingClient: ReturnType<typeof mbxGeocoding> | null = null
+
+function getGeocodingClient() {
+  if (!geocodingClient) {
+    const token = env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+    if (!token) {
+      console.warn(
+        'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN is not configured. Location features will be disabled.',
+      )
+      return null
+    }
+    try {
+      geocodingClient = mbxGeocoding({
+        accessToken: token,
+      })
+    } catch (error) {
+      console.error('Failed to initialize Mapbox geocoding client:', error)
+      return null
+    }
+  }
+  return geocodingClient
+}
 
 /**
  * Get location information using Mapbox Geocoding SDK
@@ -21,8 +41,27 @@ export async function getLocationFromCoordinates(
   level = 0,
   language = ADDRESS_LANGUAGE,
 ): Promise<ImageLocation> {
+  const client = getGeocodingClient()
+  if (!client) {
+    console.warn(
+      'Mapbox token not configured or invalid. Skipping location lookup.',
+    )
+    return {}
+  }
+
+  // Validate coordinates
+  if (
+    typeof latitude !== 'number' ||
+    typeof longitude !== 'number' ||
+    Number.isNaN(latitude) ||
+    Number.isNaN(longitude)
+  ) {
+    console.warn('Invalid coordinates provided:', { latitude, longitude })
+    return {}
+  }
+
   try {
-    const response = await geocodingClient
+    const response = await client
       .reverseGeocode({
         query: [longitude, latitude],
         language: [language],
@@ -39,7 +78,6 @@ export async function getLocationFromCoordinates(
       .send()
 
     const features = response.body.features || []
-    console.log(features)
 
     if (features.length === 0) {
       return {}
@@ -91,7 +129,21 @@ export async function getLocationFromCoordinates(
 
     return locationData
   } catch (error) {
-    console.error('Error fetching location data:', error)
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error'
+
+    // Handle specific Mapbox errors
+    if (
+      errorMessage.includes('Invalid token') ||
+      errorMessage.includes('Unauthorized')
+    ) {
+      console.warn(
+        'Mapbox token is invalid or expired. Please check NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN in .env.local',
+      )
+    } else {
+      console.error('Error fetching location data:', errorMessage)
+    }
+
     return {}
   }
 }

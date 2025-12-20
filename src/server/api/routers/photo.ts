@@ -3,7 +3,7 @@ import { desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { env } from '@/env'
 import { deleteFile, getPublicUrl, getSignedUrlForUpload } from '@/lib/storage'
-import { s3Client } from '@/lib/storage/s3-client'
+import { getS3Client } from '@/lib/storage/s3-client'
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -100,23 +100,43 @@ export const photoRouter = createTRPCRouter({
       try {
         switch (env.STORAGE_PROVIDER) {
           case 'cloudflare-r2': {
+            // Validate storage configuration
+            if (
+              !env.CLOUDFLARE_R2_ENDPOINT ||
+              !env.CLOUDFLARE_R2_BUCKET ||
+              !env.CLOUDFLARE_R2_ACCESS_KEY_ID ||
+              !env.CLOUDFLARE_R2_SECRET_ACCESS_KEY
+            ) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message:
+                  'Storage configuration is incomplete. Please check your CLOUDFLARE_R2_* environment variables in .env.local',
+              })
+            }
+
+            const s3Client = getS3Client()
             const signedUrl = await getSignedUrlForUpload(
               s3Client,
               input.fileName,
               input.fileType,
             )
+
             return { signedUrl, publicUrl: getPublicUrl(input.fileName) }
           }
           default:
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
-              message: 'Invalid storage provider',
+              message: `Invalid storage provider: ${env.STORAGE_PROVIDER}. Supported providers: cloudflare-r2, aws-s3, vercel-blob`,
             })
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error
+        }
+        console.error('Failed to get presigned URL:', error)
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to get presigned URL',
+          message: `Failed to get presigned URL: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your storage configuration.`,
         })
       }
     }),
@@ -125,8 +145,16 @@ export const photoRouter = createTRPCRouter({
     .input(z.object({ key: z.string() }))
     .mutation(async ({ input }) => {
       switch (env.STORAGE_PROVIDER) {
-        case 'cloudflare-r2':
+        case 'cloudflare-r2': {
+          const s3Client = getS3Client()
           await deleteFile(s3Client, input.key)
+          break
+        }
+        default:
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Invalid storage provider: ${env.STORAGE_PROVIDER}`,
+          })
       }
     }),
   // create photo in database
@@ -208,17 +236,20 @@ export const photoRouter = createTRPCRouter({
 
       // delete files from storage
       try {
-        if (photo.url) {
-          const originalKey = photo.url.split('/').pop()
-          if (originalKey) {
-            await deleteFile(s3Client, originalKey)
+        if (env.STORAGE_PROVIDER === 'cloudflare-r2') {
+          const s3Client = getS3Client()
+          if (photo.url) {
+            const originalKey = photo.url.split('/').pop()
+            if (originalKey) {
+              await deleteFile(s3Client, originalKey)
+            }
           }
-        }
 
-        if (photo.compressedUrl) {
-          const compressedKey = photo.compressedUrl.split('/').pop()
-          if (compressedKey) {
-            await deleteFile(s3Client, compressedKey)
+          if (photo.compressedUrl) {
+            const compressedKey = photo.compressedUrl.split('/').pop()
+            if (compressedKey) {
+              await deleteFile(s3Client, compressedKey)
+            }
           }
         }
       } catch (error) {

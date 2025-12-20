@@ -3,16 +3,13 @@ FROM oven/bun:1 AS base
 
 WORKDIR /app
 
-RUN bun install drizzle-orm postgres
+# Install dependencies (including drizzle-kit for migrations)
+COPY package.json bun.lock* ./
+RUN bun install --frozen-lockfile || bun install
 
-# Builder stage: Prepare migration environment
-FROM base AS builder
-
-WORKDIR /app
-
-COPY --from=base /app/node_modules ./node_modules
-
-COPY . .
+# Copy migration files and scripts
+COPY drizzle ./drizzle
+COPY scripts/drizzle-migrate.ts ./scripts/drizzle-migrate.ts
 
 # Execute database migration script
 CMD ["bun", "scripts/drizzle-migrate.ts"]

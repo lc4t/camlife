@@ -34,8 +34,7 @@ export function SecurityAccessCard({
   const t = useTranslations()
 
   // Debug logging
-  console.log('SecurityAccessCard - session:', session)
-  console.log('SecurityAccessCard - activeSessions:', activeSessions)
+  // Session and active sessions data
 
   const handleRevokeSession = async (sessionToRevoke: Session) => {
     const isCurrentSession = sessionToRevoke.id === session?.id
