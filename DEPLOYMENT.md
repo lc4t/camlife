@@ -65,17 +65,17 @@ nano .env  # 或使用你喜欢的编辑器
 
 ```bash
 # 使用生产环境配置启动
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 ```
 
 ### 4. 验证部署
 
 ```bash
 # 查看服务状态
-docker-compose -f docker-compose.prod.yml ps
+docker-compose ps
 
 # 查看日志
-docker-compose -f docker-compose.prod.yml logs -f web
+docker-compose logs -f web
 ```
 
 访问 `http://localhost:3000` 或配置的域名，确认应用正常运行。
@@ -98,7 +98,7 @@ docker-compose -f docker-compose.prod.yml logs -f web
 使用 `docker-compose.prod.yml` 时，Docker 会自动从 ghcr.io 拉取最新镜像：
 
 ```bash
-docker-compose -f docker-compose.prod.yml pull
+docker-compose pull
 ```
 
 **如果遇到权限错误，请参考下方"镜像访问权限"部分。**
@@ -178,8 +178,8 @@ docker run -p 3000:3000 \
 
 ```bash
 # 使用生产配置测试（需要先配置 .env）
-docker-compose -f docker-compose.prod.yml build
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose build
+docker-compose up -d
 ```
 
 ## 环境变量配置
@@ -299,7 +299,7 @@ nano .env
 
 ```bash
 # 拉取最新镜像
-docker-compose -f docker-compose.prod.yml pull
+docker-compose pull
 ```
 
 **如果镜像拉取失败（denied 错误）：**
@@ -315,17 +315,17 @@ docker-compose -f docker-compose.prod.yml pull
 
 ```bash
 # 启动所有服务（后台运行）
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 
 # 查看启动日志
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose logs -f
 ```
 
 #### 5. 验证部署
 
 ```bash
 # 检查服务状态
-docker-compose -f docker-compose.prod.yml ps
+docker-compose ps
 
 # 检查健康状态
 curl http://localhost:3000/api/health
@@ -337,14 +337,14 @@ curl http://localhost:3000/api/health
 
 ```bash
 # 运行迁移
-docker-compose -f docker-compose.prod.yml run --rm migration
+docker-compose run --rm migration
 ```
 
 #### 7. 创建管理员账户
 
 ```bash
 # 进入 web 容器
-docker-compose -f docker-compose.prod.yml exec web bash
+docker-compose exec web bash
 
 # 运行初始化脚本（如果存在）
 bun run scripts/init-account.ts
@@ -479,7 +479,7 @@ sudo certbot renew --dry-run
 2. **启动服务**
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 ```
 
 3. **访问应用**
@@ -507,24 +507,24 @@ docker-compose -f docker-compose.prod.yml up -d
 git pull origin main
 
 # 2. 拉取最新镜像
-docker-compose -f docker-compose.prod.yml pull
+docker-compose pull
 
 # 3. 重启服务
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 
 # 4. 查看日志确认更新成功
-docker-compose -f docker-compose.prod.yml logs -f web
+docker-compose logs -f web
 ```
 
 ### 备份数据库
 
 ```bash
 # 创建备份
-docker-compose -f docker-compose.prod.yml exec postgres \
+docker-compose exec postgres \
   pg_dump -U postgres camlife > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # 恢复备份
-docker-compose -f docker-compose.prod.yml exec -T postgres \
+docker-compose exec -T postgres \
   psql -U postgres camlife < backup_20240101_120000.sql
 ```
 
@@ -532,27 +532,27 @@ docker-compose -f docker-compose.prod.yml exec -T postgres \
 
 ```bash
 # 查看所有服务日志
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose logs -f
 
 # 查看特定服务日志
-docker-compose -f docker-compose.prod.yml logs -f web
-docker-compose -f docker-compose.prod.yml logs -f postgres
+docker-compose logs -f web
+docker-compose logs -f postgres
 
 # 查看最近 100 行日志
-docker-compose -f docker-compose.prod.yml logs --tail=100 web
+docker-compose logs --tail=100 web
 ```
 
 ### 停止服务
 
 ```bash
 # 停止服务（保留数据）
-docker-compose -f docker-compose.prod.yml stop
+docker-compose stop
 
 # 停止并删除容器（保留数据卷）
-docker-compose -f docker-compose.prod.yml down
+docker-compose down
 
 # 停止并删除所有数据（危险！）
-docker-compose -f docker-compose.prod.yml down -v
+docker-compose down -v
 ```
 
 ## 故障排查
@@ -563,10 +563,10 @@ docker-compose -f docker-compose.prod.yml down -v
 
 ```bash
 # 检查服务状态
-docker-compose -f docker-compose.prod.yml ps
+docker-compose ps
 
 # 查看错误日志
-docker-compose -f docker-compose.prod.yml logs web
+docker-compose logs web
 
 # 检查端口占用
 netstat -tulpn | grep 3000
@@ -576,13 +576,13 @@ netstat -tulpn | grep 3000
 
 ```bash
 # 检查数据库服务
-docker-compose -f docker-compose.prod.yml ps postgres
+docker-compose ps postgres
 
 # 检查数据库日志
-docker-compose -f docker-compose.prod.yml logs postgres
+docker-compose logs postgres
 
 # 测试数据库连接
-docker-compose -f docker-compose.prod.yml exec postgres \
+docker-compose exec postgres \
   psql -U postgres -d camlife -c "SELECT 1;"
 ```
 
@@ -609,10 +609,10 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
 
 ```bash
 # 手动运行迁移
-docker-compose -f docker-compose.prod.yml run --rm migration
+docker-compose run --rm migration
 
 # 检查迁移文件
-docker-compose -f docker-compose.prod.yml exec web ls -la /app/drizzle
+docker-compose exec web ls -la /app/drizzle
 ```
 
 ### 获取帮助
@@ -621,7 +621,7 @@ docker-compose -f docker-compose.prod.yml exec web ls -la /app/drizzle
 
 1. 查看 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 2. 查看 GitHub Issues: https://github.com/lc4t/camlife/issues
-3. 查看应用日志：`docker-compose -f docker-compose.prod.yml logs -f`
+3. 查看应用日志：`docker-compose logs -f`
 
 ## 安全建议
 

@@ -45,7 +45,7 @@ CLOUDFLARE_R2_PUBLIC_URL=https://your-public-url.com
 
 ```bash
 # 直接拉取镜像
-docker-compose -f docker-compose.prod.yml pull
+docker-compose pull
 ```
 
 **如果镜像需要认证（私有仓库）：**
@@ -59,7 +59,7 @@ docker-compose -f docker-compose.prod.yml pull
 echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
 
 # 3. 拉取镜像
-docker-compose -f docker-compose.prod.yml pull
+docker-compose pull
 ```
 
 #### 选项 B: 本地构建镜像（镜像未构建或需要测试时）
@@ -100,24 +100,24 @@ services:
 然后使用：
 
 ```bash
-docker-compose -f docker-compose.prod.yml -f docker-compose.local.yml up -d
+docker-compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
 ### 步骤 3: 启动服务
 
 ```bash
 # 启动所有服务
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 
 # 查看日志
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose logs -f
 ```
 
 ### 步骤 4: 验证部署
 
 ```bash
 # 检查服务状态
-docker-compose -f docker-compose.prod.yml ps
+docker-compose ps
 
 # 检查健康状态
 curl http://localhost:3000/api/health
@@ -177,7 +177,7 @@ Error response from daemon: Head "https://ghcr.io/v2/lc4t/camlife-dev/manifests/
 docker build -f docker/web/Dockerfile -t ghcr.io/lc4t/camlife-dev:latest .
 
 # 然后启动服务
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 ```
 
 **方法 2: 登录 GitHub Container Registry**
@@ -191,7 +191,7 @@ docker-compose -f docker-compose.prod.yml up -d
 echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
 
 # 拉取镜像
-docker-compose -f docker-compose.prod.yml pull
+docker-compose pull
 ```
 
 **方法 3: 修改 docker-compose 使用本地构建**
@@ -216,7 +216,7 @@ services:
 然后运行：
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose up -d --build
 ```
 
 ### 问题 3: 迁移服务失败
@@ -224,13 +224,13 @@ docker-compose -f docker-compose.prod.yml up -d --build
 **检查迁移日志：**
 
 ```bash
-docker-compose -f docker-compose.prod.yml logs migration
+docker-compose logs migration
 ```
 
 **手动运行迁移：**
 
 ```bash
-docker-compose -f docker-compose.prod.yml run --rm migration
+docker-compose run --rm migration
 ```
 
 ## 📝 本地测试（使用 hosts 文件）
@@ -265,7 +265,7 @@ notepad C:\Windows\System32\drivers\etc\hosts
 ### 2. 启动服务
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 ```
 
 ### 3. 访问应用
@@ -281,13 +281,13 @@ docker-compose -f docker-compose.prod.yml up -d
 git pull
 
 # 2. 拉取最新镜像（如果使用远程镜像）
-docker-compose -f docker-compose.prod.yml pull
+docker-compose pull
 
 # 3. 或重新构建（如果使用本地构建）
-docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose up -d --build
 
 # 4. 查看日志
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose logs -f
 ```
 
 ## 📚 更多信息

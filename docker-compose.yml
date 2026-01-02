@@ -1,33 +1,48 @@
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:latest
+    image: postgres:16-alpine
     container_name: camlife-postgres
     restart: always
     environment:
-      POSTGRES_DB: camlife
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-camlife}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # 注意：POSTGRES_PASSWORD 必须从 .env 文件设置
+      # 如果未设置，请创建 .env 文件并配置
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD environment variable is required. Please create .env file.}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - camlife_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # 资源限制：支持10个并发用户
+    # PostgreSQL 基础内存约 256MB，10个用户连接约 256MB
+    # 注意：deploy.resources 在 Docker Swarm 模式下生效
+    # 普通模式下可以使用 docker update --memory=512M --cpus=0.5 camlife-postgres 设置限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    # 生产环境不暴露端口，仅内部访问
+    # ports:
+    #   - "5432:5432"
 
   # Database Migration Service
   migration:
-    build:
-      context: .
-      dockerfile: docker/migrations/Dockerfile
-    image: camlife-migration
+    image: ghcr.io/lc4t/camlife-dev:latest
+    command: bun run scripts/drizzle-migrate.ts
     environment:
-      DATABASE_URL: "postgresql://postgres:password@postgres:5432/camlife"
+      # DATABASE_URL is automatically generated from PostgreSQL configuration
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-camlife}
+      SKIP_ENV_VALIDATION: "true"
     env_file:
       - .env
     depends_on:
@@ -36,19 +51,30 @@ services:
     networks:
       - camlife_network
     restart: "no"
+    # 迁移服务资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
   # Next.js Web Application
   web:
-    build:
-      context: .
-      dockerfile: docker/web/Dockerfile
-    image: camlife-web
+    image: ghcr.io/lc4t/camlife-dev:latest
     container_name: camlife-web
     restart: always
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      DATABASE_URL: "postgresql://postgres:password@postgres:5432/camlife"
+      NODE_ENV: production
+      # DATABASE_URL is automatically generated from PostgreSQL configuration
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-camlife}
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      SKIP_ENV_VALIDATION: "true"
     env_file:
       - .env
     depends_on:
@@ -58,10 +84,32 @@ services:
         condition: service_completed_successfully
     networks:
       - camlife_network
+    # 资源限制：支持10个并发用户
+    # 每个用户约 50-100MB 内存，10个用户约 500MB-1GB，加上基础内存约 512MB
+    # 注意：deploy.resources 在 Docker Swarm 模式下生效
+    # 普通模式下可以使用 docker update --memory=1.5G --cpus=1.0 camlife-web 设置限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # 健康检查
+    # 使用简单的端口检查（更可靠，不依赖外部工具）
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/3000' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
+    name: camlife_postgres_data
 
 networks:
   camlife_network:
+    name: camlife_network
     driver: bridge
