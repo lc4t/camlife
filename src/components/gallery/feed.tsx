@@ -77,7 +77,7 @@ export function FeedGallery({
               fill
               alt={photo.title || t('photo')}
               priority={index < perPagePhotosCountInfinite}
-              className='rounded-lg shadow-2xl'
+              className='rounded-lg object-contain shadow-2xl'
               sizes={`(min-width: 1280px) min(${displaySize.width}px, calc(100vw - 384px)), (min-width: 768px) min(${displaySize.width}px, calc(100vw - 96px)), min(${displaySize.width}px, 100vw)`}
             />
           )}
