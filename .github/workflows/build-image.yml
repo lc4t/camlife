@@ -1,16 +1,21 @@
-name: Build and Push Docker Image
+name: Build Docker Image
+
+# This workflow only builds and pushes Docker images to GitHub Container Registry.
+# It does NOT perform any deployment. Deployment should be done manually or via separate workflow.
 
 on:
   push:
     branches:
       - main
       - master
+      - dev
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
       - master
+      - dev
   workflow_dispatch:
 
 env:

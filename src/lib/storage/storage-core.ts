@@ -1,3 +1,15 @@
+/**
+ * Storage core utilities
+ *
+ * This module provides unified storage operations for multiple providers:
+ * - Cloudflare R2
+ * - Tencent Cloud COS
+ * - AWS S3
+ *
+ * All functions automatically route to the appropriate provider based on
+ * the STORAGE_PROVIDER environment variable.
+ */
+
 import {
   DeleteObjectCommand,
   PutObjectCommand,
