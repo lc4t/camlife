@@ -25,6 +25,7 @@ import {
   Share,
   Trash2,
 } from 'lucide-react'
+import { nanoid } from 'nanoid'
 import { useLocale, useTranslations } from 'next-intl'
 import { useTheme } from 'next-themes'
 import { useState } from 'react'
@@ -756,7 +757,7 @@ export const DataTable = () => {
           <TableBody>
             {isLoading ? (
               Array.from({ length: 5 }).map(() => (
-                <SkeletonRow key={crypto.randomUUID()} />
+                <SkeletonRow key={nanoid()} />
               ))
             ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (

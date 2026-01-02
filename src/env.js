@@ -13,18 +13,32 @@ export const env = createEnv({
     DATABASE_URL: z.url(),
     // Storage provider
     STORAGE_PROVIDER: z
-      .enum(['cloudflare-r2', 'aws-s3', 'vercel-blob'])
+      .enum(['cloudflare-r2', 'tencent-cos', 'aws-s3', 'vercel-blob'])
       .default('cloudflare-r2'),
+
     // Cloudflare R2 storage configuration
-    CLOUDFLARE_R2_ENDPOINT: z.url(),
-    CLOUDFLARE_R2_BUCKET: z.string(),
+    CLOUDFLARE_R2_ENDPOINT: z.url().optional(),
+    CLOUDFLARE_R2_BUCKET: z.string().optional(),
     CLOUDFLARE_R2_REGION: z.string().default('auto'),
-    CLOUDFLARE_R2_ACCESS_KEY_ID: z.string(),
-    CLOUDFLARE_R2_SECRET_ACCESS_KEY: z.string(),
+    CLOUDFLARE_R2_ACCESS_KEY_ID: z.string().optional(),
+    CLOUDFLARE_R2_SECRET_ACCESS_KEY: z.string().optional(),
     CLOUDFLARE_R2_PREFIX: z.string().default('camlife'),
-    CLOUDFLARE_R2_PUBLIC_URL: z.string().url(),
-    // Note: Mapbox has been replaced with MapLibre (free and open-source)
+    CLOUDFLARE_R2_PUBLIC_URL: z.string().url().optional(),
+
+    // Tencent Cloud COS storage configuration
+    TENCENT_COS_SECRET_ID: z.string().optional(),
+    TENCENT_COS_SECRET_KEY: z.string().optional(),
+    TENCENT_COS_BUCKET: z.string().optional(),
+    TENCENT_COS_REGION: z.string().optional(),
+    TENCENT_COS_PREFIX: z.string().default('camlife'),
+    TENCENT_COS_PUBLIC_URL: z.string().url().optional(),
+
+    // Note: MapLibre (free and open-source) is used for maps
     // No API token is required for map rendering or geocoding
+
+    // Registration restriction - comma-separated list of allowed emails
+    // If empty or not set, registration is open to all (first user only by default)
+    ALLOWED_EMAILS: z.string().optional(),
   },
 
   /**
@@ -33,9 +47,7 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    // MapTiler API key (optional, for better map styles)
-    // Get free key at: https://cloud.maptiler.com/account/keys/
-    NEXT_PUBLIC_MAPTILER_API_KEY: z.string().optional(),
+    // Analytics (optional)
     NEXT_PUBLIC_UMAMI_ANALYTICS_ID: z.string().optional(),
     NEXT_PUBLIC_UMAMI_ANALYTICS_JS: z.string().optional(),
   },
@@ -58,9 +70,18 @@ export const env = createEnv({
       process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
     CLOUDFLARE_R2_PREFIX: process.env.CLOUDFLARE_R2_PREFIX,
     CLOUDFLARE_R2_PUBLIC_URL: process.env.CLOUDFLARE_R2_PUBLIC_URL,
-    NEXT_PUBLIC_MAPTILER_API_KEY: process.env.NEXT_PUBLIC_MAPTILER_API_KEY,
+    // Tencent COS
+    TENCENT_COS_SECRET_ID: process.env.TENCENT_COS_SECRET_ID,
+    TENCENT_COS_SECRET_KEY: process.env.TENCENT_COS_SECRET_KEY,
+    TENCENT_COS_BUCKET: process.env.TENCENT_COS_BUCKET,
+    TENCENT_COS_REGION: process.env.TENCENT_COS_REGION,
+    TENCENT_COS_PREFIX: process.env.TENCENT_COS_PREFIX,
+    TENCENT_COS_PUBLIC_URL: process.env.TENCENT_COS_PUBLIC_URL,
+    // Analytics
     NEXT_PUBLIC_UMAMI_ANALYTICS_ID: process.env.NEXT_PUBLIC_UMAMI_ANALYTICS_ID,
     NEXT_PUBLIC_UMAMI_ANALYTICS_JS: process.env.NEXT_PUBLIC_UMAMI_ANALYTICS_JS,
+    // Registration restriction
+    ALLOWED_EMAILS: process.env.ALLOWED_EMAILS,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

@@ -16,7 +16,10 @@ import { useConfetti } from '@/hooks/use-confetti'
 import { useAppSettings } from '@/hooks/use-settings'
 import { formatExifDateTime } from '@/lib/format'
 import { generateBlurData, getLocationFromCoordinates } from '@/lib/image'
-import { uploadFileViaProxy, uploadFileWithProgress } from '@/lib/storage'
+import {
+  uploadFileViaProxy,
+  uploadFileWithProgress,
+} from '@/lib/storage/client'
 import { cn, getCompressedFileName } from '@/lib/utils'
 import { useCommonStore } from '@/stores/common'
 import { usePhotoStore } from '@/stores/photo'
@@ -210,17 +213,112 @@ export function FileUpload() {
 
       setStep('location')
       let imageLocation: ImageLocation | null = null
-      if (exifData?.GPSLatitude && exifData?.GPSLongitude) {
-        try {
-          imageLocation = await getLocationFromCoordinates(
-            Number(exifData.GPSLatitude?.description),
-            Number(exifData.GPSLongitude?.description),
-            3,
-            addressLanguage,
-          )
-        } catch (error) {
-          console.error('get location failed: ', error)
-          toast.error(t('get-location-failed'))
+
+      // Helper function to convert GPS coordinates from DMS (degrees, minutes, seconds) to decimal
+      const convertDMSToDecimal = (
+        value: unknown,
+        ref: 'N' | 'S' | 'E' | 'W' | undefined,
+      ): number | null => {
+        if (!value || !Array.isArray(value)) {
+          // Try to parse from description if value is not an array
+          if (value && typeof value === 'object' && 'description' in value) {
+            const desc = (value as { description?: string }).description
+            if (desc && typeof desc === 'string') {
+              // Try to parse decimal from description string
+              const decimalMatch = desc.match(/(-?\d+\.?\d*)/)
+              if (decimalMatch?.[1]) {
+                const decimal = Number.parseFloat(decimalMatch[1])
+                if (!Number.isNaN(decimal)) {
+                  // Apply direction (N/S/E/W)
+                  if (ref === 'S' || ref === 'W') {
+                    return -Math.abs(decimal)
+                  }
+                  return Math.abs(decimal)
+                }
+              }
+            }
+          }
+          return null
+        }
+
+        // Value is an array [degrees, minutes, seconds] or [numerator, denominator]
+        let degrees = 0
+        let minutes = 0
+        let seconds = 0
+
+        if (value.length >= 1) {
+          if (Array.isArray(value[0])) {
+            // Format: [[numerator, denominator], [numerator, denominator], [numerator, denominator]]
+            degrees = (value[0][0] as number) / ((value[0][1] as number) || 1)
+            if (value.length >= 2 && Array.isArray(value[1])) {
+              minutes = (value[1][0] as number) / ((value[1][1] as number) || 1)
+            }
+            if (value.length >= 3 && Array.isArray(value[2])) {
+              seconds = (value[2][0] as number) / ((value[2][1] as number) || 1)
+            }
+          } else {
+            // Format: [degrees, minutes, seconds] as numbers
+            degrees = Number(value[0]) || 0
+            minutes = Number(value[1]) || 0
+            seconds = Number(value[2]) || 0
+          }
+        }
+
+        // Convert DMS to decimal
+        let decimal = degrees + minutes / 60 + seconds / 3600
+
+        // Apply direction (N/S/E/W)
+        if (ref === 'S' || ref === 'W') {
+          decimal = -Math.abs(decimal)
+        } else {
+          decimal = Math.abs(decimal)
+        }
+
+        return decimal
+      }
+
+      // Extract GPS coordinates
+      const gpsLatitude = exifData?.GPSLatitude
+      const gpsLongitude = exifData?.GPSLongitude
+      const gpsLatitudeRef = exifData?.GPSLatitudeRef?.value as
+        | 'N'
+        | 'S'
+        | undefined
+      const gpsLongitudeRef = exifData?.GPSLongitudeRef?.value as
+        | 'E'
+        | 'W'
+        | undefined
+
+      if (gpsLatitude && gpsLongitude) {
+        const latitude = convertDMSToDecimal(gpsLatitude.value, gpsLatitudeRef)
+        const longitude = convertDMSToDecimal(
+          gpsLongitude.value,
+          gpsLongitudeRef,
+        )
+
+        if (
+          latitude !== null &&
+          longitude !== null &&
+          !Number.isNaN(latitude) &&
+          !Number.isNaN(longitude) &&
+          latitude >= -90 &&
+          latitude <= 90 &&
+          longitude >= -180 &&
+          longitude <= 180
+        ) {
+          try {
+            imageLocation = await getLocationFromCoordinates(
+              latitude,
+              longitude,
+              3,
+              addressLanguage,
+            )
+          } catch (error) {
+            console.error('get location failed: ', error)
+            toast.error(t('get-location-failed'))
+          }
+        } else {
+          console.warn('Invalid GPS coordinates:', { latitude, longitude })
         }
       }
 
@@ -258,8 +356,106 @@ export function FileUpload() {
           exposureCompensation:
             (exifData.ExposureBiasValue?.value[0] as number) /
             (exifData.ExposureBiasValue?.value[1] as number),
-          latitude: Number(exifData.GPSLatitude?.description),
-          longitude: Number(exifData.GPSLongitude?.description),
+          latitude: (() => {
+            const gpsLat = exifData.GPSLatitude
+            const gpsLatRef = exifData.GPSLatitudeRef?.value as
+              | 'N'
+              | 'S'
+              | undefined
+            if (!gpsLat) return undefined
+            // Try to parse from value array first
+            if (Array.isArray(gpsLat.value)) {
+              let degrees = 0
+              let minutes = 0
+              let seconds = 0
+              if (Array.isArray(gpsLat.value[0])) {
+                degrees =
+                  (gpsLat.value[0][0] as number) /
+                  ((gpsLat.value[0][1] as number) || 1)
+                if (gpsLat.value[1] && Array.isArray(gpsLat.value[1])) {
+                  minutes =
+                    (gpsLat.value[1][0] as number) /
+                    ((gpsLat.value[1][1] as number) || 1)
+                }
+                if (gpsLat.value[2] && Array.isArray(gpsLat.value[2])) {
+                  seconds =
+                    (gpsLat.value[2][0] as number) /
+                    ((gpsLat.value[2][1] as number) || 1)
+                }
+              } else {
+                degrees = Number(gpsLat.value[0]) || 0
+                minutes = Number(gpsLat.value[1]) || 0
+                seconds = Number(gpsLat.value[2]) || 0
+              }
+              let decimal = degrees + minutes / 60 + seconds / 3600
+              if (gpsLatRef === 'S') decimal = -Math.abs(decimal)
+              else decimal = Math.abs(decimal)
+              return decimal
+            }
+            // Fallback to description parsing
+            if (gpsLat.description) {
+              const match = gpsLat.description.match(/(-?\d+\.?\d*)/)
+              if (match?.[1]) {
+                const decimal = Number.parseFloat(match[1])
+                if (!Number.isNaN(decimal)) {
+                  return gpsLatRef === 'S'
+                    ? -Math.abs(decimal)
+                    : Math.abs(decimal)
+                }
+              }
+            }
+            return undefined
+          })(),
+          longitude: (() => {
+            const gpsLng = exifData.GPSLongitude
+            const gpsLngRef = exifData.GPSLongitudeRef?.value as
+              | 'E'
+              | 'W'
+              | undefined
+            if (!gpsLng) return undefined
+            // Try to parse from value array first
+            if (Array.isArray(gpsLng.value)) {
+              let degrees = 0
+              let minutes = 0
+              let seconds = 0
+              if (Array.isArray(gpsLng.value[0])) {
+                degrees =
+                  (gpsLng.value[0][0] as number) /
+                  ((gpsLng.value[0][1] as number) || 1)
+                if (gpsLng.value[1] && Array.isArray(gpsLng.value[1])) {
+                  minutes =
+                    (gpsLng.value[1][0] as number) /
+                    ((gpsLng.value[1][1] as number) || 1)
+                }
+                if (gpsLng.value[2] && Array.isArray(gpsLng.value[2])) {
+                  seconds =
+                    (gpsLng.value[2][0] as number) /
+                    ((gpsLng.value[2][1] as number) || 1)
+                }
+              } else {
+                degrees = Number(gpsLng.value[0]) || 0
+                minutes = Number(gpsLng.value[1]) || 0
+                seconds = Number(gpsLng.value[2]) || 0
+              }
+              let decimal = degrees + minutes / 60 + seconds / 3600
+              if (gpsLngRef === 'W') decimal = -Math.abs(decimal)
+              else decimal = Math.abs(decimal)
+              return decimal
+            }
+            // Fallback to description parsing
+            if (gpsLng.description) {
+              const match = gpsLng.description.match(/(-?\d+\.?\d*)/)
+              if (match?.[1]) {
+                const decimal = Number.parseFloat(match[1])
+                if (!Number.isNaN(decimal)) {
+                  return gpsLngRef === 'W'
+                    ? -Math.abs(decimal)
+                    : Math.abs(decimal)
+                }
+              }
+            }
+            return undefined
+          })(),
           gpsAltitude: Array.isArray(exifData.GPSAltitude?.value)
             ? (exifData.GPSAltitude.value[0] as number) /
               (exifData.GPSAltitude.value[1] as number)

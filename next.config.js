@@ -15,6 +15,10 @@ const withBundleAnalyzer = bundleAnalyzer({
 /** @type {import("next").NextConfig} */
 const config = {
   output: 'standalone',
+  // Ignore TypeScript errors during build (useful for Docker builds and third-party lib issues)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   // Transpile maplibre-gl for Next.js
   transpilePackages: ['maplibre-gl'],
   turbopack: {

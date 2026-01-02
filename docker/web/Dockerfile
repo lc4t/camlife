@@ -7,8 +7,9 @@ WORKDIR /app
 
 # Install dependencies with bun
 FROM base AS deps
-COPY package.json bun.lock* ./
-RUN bun install --no-save --frozen-lockfile
+COPY package.json ./
+# Install dependencies and generate lockfile
+RUN bun install --no-save
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -39,8 +40,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME="0.0.0.0"
 
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --shell /bin/bash --create-home nextjs
 
 COPY --from=builder /app/public ./public
 
@@ -48,6 +49,16 @@ COPY --from=builder /app/public ./public
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy migration files and scripts for database migration
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/drizzle-migrate.ts ./scripts/drizzle-migrate.ts
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+
+# Install migration dependencies (drizzle-orm, postgres)
+# These are needed for running migrations but may not be in standalone output
+# drizzle-orm/postgres-js is part of drizzle-orm package, not a separate package
+RUN bun install --production --no-save drizzle-orm postgres
 
 USER nextjs
 

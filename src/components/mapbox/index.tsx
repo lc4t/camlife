@@ -5,7 +5,6 @@ import '@/styles/mapbox.css'
 
 import maplibregl from 'maplibre-gl'
 import Image from 'next/image'
-import { useTheme } from 'next-themes'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   GeolocateControl,
@@ -16,7 +15,6 @@ import {
 } from 'react-map-gl/maplibre'
 import { MapPoints } from '@/components/mapbox/map-points'
 import { MapTools } from '@/components/mapbox/toolbar'
-import { env } from '@/env'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { api } from '@/trpc/react'
 import type { PopupInfo } from '@/types'
@@ -26,8 +24,6 @@ interface MapBoxProps {
 }
 
 export default function MapBox({ hideControls }: MapBoxProps) {
-  const { resolvedTheme } = useTheme()
-
   const isMobile = useIsMobile()
 
   const { data: coordinates } = api.photo.getAllCoordinates.useQuery()
@@ -39,21 +35,41 @@ export default function MapBox({ hideControls }: MapBoxProps) {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
 
-  // map style - using MapTiler if API key is configured, otherwise use demo tiles
-  const mapStyle = useMemo(() => {
-    const maptilerKey = env.NEXT_PUBLIC_MAPTILER_API_KEY
+  // Free OpenStreetMap raster tiles - no API key required, very reliable
+  const mapStyle = useMemo<maplibregl.StyleSpecification>(
+    () => ({
+      version: 8,
+      sources: {
+        osm: {
+          type: 'raster',
+          tiles: [
+            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          ],
+          tileSize: 256,
+          attribution:
+            '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        },
+      },
+      layers: [
+        {
+          id: 'osm-layer',
+          type: 'raster',
+          source: 'osm',
+          minzoom: 0,
+          maxzoom: 19,
+        },
+      ],
+    }),
+    [],
+  )
 
-    if (maptilerKey) {
-      // Use MapTiler styles (better quality, supports dark mode)
-      // Available styles: openstreetmap, basic, streets, outdoors, satellite
-      // See: https://docs.maptiler.com/cloud/api/maps/
-      const styleName = resolvedTheme === 'dark' ? 'dark-v2' : 'streets-v2'
-      return `https://api.maptiler.com/maps/${styleName}/style.json?key=${maptilerKey}`
-    }
-
-    // Fallback to demo tiles (no API key required)
-    return 'https://demotiles.maplibre.org/style.json'
-  }, [resolvedTheme])
+  // Handle map errors
+  const handleMapError = useCallback((e: { error?: { message?: string } }) => {
+    const errorMessage = e.error?.message || ''
+    console.warn('Map warning (non-critical):', errorMessage || e)
+  }, [])
 
   // Create initial view state with mobile-specific zoom
   const initialViewState = useMemo(
@@ -255,6 +271,7 @@ export default function MapBox({ hideControls }: MapBoxProps) {
         projection={isGlobe ? 'globe' : 'mercator'}
         minZoom={isMobile ? -2 : undefined}
         maxZoom={isMobile ? 3 : undefined}
+        onError={handleMapError}
       >
         <MapPoints
           geojsonData={geojsonData}

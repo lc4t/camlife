@@ -1,15 +1,29 @@
 # 存储服务配置指南
 
-本指南将帮助您配置 Cloudflare R2 存储服务，以便在本地开发环境中上传照片。
+本指南将帮助您配置对象存储服务，用于存储上传的照片。
 
-## 为什么需要配置存储？
+## 支持的存储服务
 
-CamLife 需要将上传的照片存储到云存储服务中。目前支持：
-- **Cloudflare R2**（推荐，与 S3 兼容）
-- AWS S3
-- Vercel Blob
+| 存储服务 | 推荐指数 | 特点 |
+|---------|---------|------|
+| **Cloudflare R2** | ⭐⭐⭐⭐⭐ | 免费额度高（10GB存储+每月100万次读取），S3 兼容，全球 CDN |
+| **腾讯云 COS** | ⭐⭐⭐⭐ | 国内访问快，S3 兼容，价格合理 |
+| **AWS S3** | ⭐⭐⭐ | 稳定可靠，生态完善，适合企业级应用 |
+| **Vercel Blob** | ⭐⭐⭐ | 与 Vercel 集成方便，适合小型项目 |
 
-## Cloudflare R2 配置步骤
+---
+
+## 📋 目录
+
+- [Cloudflare R2 配置](#cloudflare-r2-配置)
+- [腾讯云 COS 配置](#腾讯云-cos-配置)
+- [安全最佳实践](#安全最佳实践)
+- [CORS 配置指南](#cors-配置指南)
+- [常见问题](#常见问题)
+
+---
+
+## Cloudflare R2 配置
 
 ### 1. 创建 Cloudflare 账户
 
@@ -20,7 +34,7 @@ CamLife 需要将上传的照片存储到云存储服务中。目前支持：
 
 1. 登录 Cloudflare Dashboard
 2. 在左侧菜单选择 **R2**
-3. 点击 **Create bucket**（创建存储桶）
+3. 点击 **Create bucket**
 4. 输入存储桶名称（例如：`camlife-photos`）
 5. 选择位置（建议选择离您最近的区域）
 6. 点击 **Create bucket**
@@ -29,254 +43,351 @@ CamLife 需要将上传的照片存储到云存储服务中。目前支持：
 
 1. 在 R2 页面，点击右上角的 **Manage R2 API Tokens**
 2. 点击 **Create API token**
-3. 配置权限：
-   - **Token name**: `camlife-dev`（或您喜欢的名称）
-   - **Permissions**: 选择 **Object Read & Write**
-   - **TTL**: 留空（永久有效）或设置过期时间
+3. 配置：
+   - **Token name**: `camlife-prod`
+   - **Permissions**: **Object Read & Write**
+   - **Specify bucket(s)**: 选择特定存储桶（更安全）
+   - **TTL**: 建议设置过期时间（如 1 年）
 4. 点击 **Create API Token**
-5. **重要**：复制并保存以下信息（只显示一次）：
-   - **Access Key ID**
-   - **Secret Access Key**
+5. **重要**：复制并安全保存 **Access Key ID** 和 **Secret Access Key**
 
-### 4. 配置 CORS（仅生产环境需要）
+### 4. 配置公开访问
 
-**重要**：本地开发时，应用默认使用**服务器端代理上传**，**不需要配置 CORS**！
+1. 选择存储桶 → **Settings**
+2. 找到 **Public Access**
+3. 点击 **Allow Access**
+4. 选择方式：
+   - **R2.dev subdomain**（快速，格式：`https://pub-xxxxx.r2.dev`）
+   - **Connect Custom Domain**（推荐生产环境，需要自有域名）
 
-#### 本地开发（推荐：使用服务器端代理）
+### 5. 环境变量配置
 
-本地开发时，应用会自动使用服务器端代理上传，完全绕过 CORS 限制：
-- ✅ 无需配置 CORS
-- ✅ 更安全（凭证在服务器端）
-- ✅ 更简单（无需处理跨域问题）
-
-**无需任何额外配置**，直接使用即可！
-
-#### 生产环境（需要配置 CORS）
-
-如果生产环境使用直接上传（客户端直接上传到 R2），则需要配置 CORS：
-
-1. 在 R2 页面，选择您创建的存储桶
-2. 点击 **Settings** 标签
-3. 找到 **CORS Policy** 部分
-4. 点击 **Edit CORS Policy**
-5. 粘贴以下配置（替换为您的生产域名）：
-
-```json
-[
-  {
-    "AllowedOrigins": [
-      "https://your-production-domain.com",
-      "https://www.your-production-domain.com"
-    ],
-    "AllowedMethods": ["PUT", "GET", "HEAD", "DELETE"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": ["ETag", "Content-Length"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
-
-6. 点击 **Save**
-
-**注意**：
-- 本地开发：使用代理，无需 CORS
-- 生产环境：如果使用直接上传，需要配置 CORS
-- 生产环境也可以继续使用代理（设置 `NEXT_PUBLIC_USE_UPLOAD_PROXY=true`），这样也不需要 CORS
-
-### 5. 配置自定义域名（可选，但推荐）
-
-为了能够通过公共 URL 访问照片，您需要配置自定义域名：
-
-1. 在存储桶的 **Settings** 页面
-2. 找到 **Public Access** 部分
-3. 点击 **Connect Domain** 或 **Add Custom Domain**
-4. 输入您的域名（例如：`cdn.yourdomain.com`）
-5. 按照提示配置 DNS 记录
-6. 等待 DNS 生效（通常几分钟）
-
-**如果没有自定义域名**：
-- 可以使用 Cloudflare 提供的临时 URL（格式：`https://pub-xxxxx.r2.dev`）
-- 或者暂时跳过此步骤，但照片将无法通过公共 URL 访问
-
-### 6. 获取存储桶信息
-
-在存储桶的 **Settings** 页面，找到以下信息：
-
-- **Bucket Name**: 您创建的存储桶名称
-- **Endpoint**: 格式类似 `https://xxxxx.r2.cloudflarestorage.com`
-  - 可以在 API Token 页面找到，或使用格式：`https://<account-id>.r2.cloudflarestorage.com`
-  - Account ID 可以在 Cloudflare Dashboard 的右侧栏找到
-
-### 7. 配置环境变量
-
-在项目根目录的 `.env.local` 文件中添加以下配置：
-
-```env
-# 存储提供商
+```bash
 STORAGE_PROVIDER=cloudflare-r2
-
-# Cloudflare R2 配置
 CLOUDFLARE_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
 CLOUDFLARE_R2_BUCKET=your-bucket-name
 CLOUDFLARE_R2_REGION=auto
 CLOUDFLARE_R2_ACCESS_KEY_ID=your-access-key-id
 CLOUDFLARE_R2_SECRET_ACCESS_KEY=your-secret-access-key
 CLOUDFLARE_R2_PREFIX=camlife
-CLOUDFLARE_R2_PUBLIC_URL=https://your-custom-domain.com
+CLOUDFLARE_R2_PUBLIC_URL=https://your-public-url.com
 ```
 
-**配置说明**：
+---
 
-- `CLOUDFLARE_R2_ENDPOINT`: 替换 `your-account-id` 为您的 Cloudflare Account ID
-- `CLOUDFLARE_R2_BUCKET`: 替换为您的存储桶名称
-- `CLOUDFLARE_R2_ACCESS_KEY_ID`: 粘贴步骤 3 中保存的 Access Key ID
-- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`: 粘贴步骤 3 中保存的 Secret Access Key
-- `CLOUDFLARE_R2_PREFIX`: 可选，用于组织文件（例如：`camlife` 会在所有文件前添加 `camlife/` 前缀）
-- `CLOUDFLARE_R2_PUBLIC_URL`: **必需**，用于预览图片
-  - 如果配置了自定义域名，使用您的域名
-  - 如果没有，可以使用 Cloudflare 提供的临时 URL（格式：`https://pub-xxxxx.r2.dev`）
-  - **重要**：必须先在存储桶设置中启用公开访问（见步骤 5）
+## 腾讯云 COS 配置
 
-### 5. 配置公开访问（必需，用于预览图片）
+### 1. 创建腾讯云账户
 
-**重要**：如果不配置公开访问，上传的图片将无法在浏览器中预览！
+1. 访问 [腾讯云](https://cloud.tencent.com/)
+2. 注册或登录账户
+3. 完成实名认证
 
-#### 选项 A：使用 R2.dev 子域名（推荐，最简单）
+### 2. 创建 COS 存储桶
 
-1. 在 R2 页面，选择您创建的存储桶
-2. 点击 **Settings** 标签
-3. 找到 **Public Access** 部分
-4. 点击 **Allow Access** 按钮
-5. 选择 **R2.dev subdomain**
-6. 复制生成的公共 URL（格式：`https://pub-xxxxx.r2.dev`）
-7. 在 `.env.local` 中设置：
-   ```env
-   CLOUDFLARE_R2_PUBLIC_URL=https://pub-xxxxx.r2.dev
-   ```
+1. 进入 [对象存储控制台](https://console.cloud.tencent.com/cos)
+2. 点击 **存储桶列表** → **创建存储桶**
+3. 配置：
+   - **名称**: `camlife`（系统会自动添加 APPID 后缀）
+   - **所属地域**: 选择离用户最近的地域（如 `ap-shanghai`）
+   - **访问权限**: 选择 **公有读私有写**（用于图片预览）
+4. 点击 **创建**
 
-#### 选项 B：使用自定义域名（生产环境推荐）
+### 3. 获取 API 密钥
 
-1. 在 R2 页面，选择您创建的存储桶
-2. 点击 **Settings** 标签
-3. 找到 **Public Access** 部分
-4. 点击 **Allow Access** 按钮
-5. 选择 **Connect Custom Domain**
-6. 选择您的 Cloudflare 域名
-7. 在 `.env.local` 中设置：
-   ```env
-   CLOUDFLARE_R2_PUBLIC_URL=https://your-custom-domain.com
-   ```
+1. 进入 [访问管理 → API密钥管理](https://console.cloud.tencent.com/cam/capi)
+2. 点击 **新建密钥**
+3. 复制并安全保存 **SecretId** 和 **SecretKey**
 
-**注意**：
-- 公开访问 URL 必须正确配置，否则图片无法预览
-- 如果使用 R2.dev 子域名，URL 格式为：`https://pub-<随机字符串>.r2.dev`
-- 确保 `.env.local` 中的 `CLOUDFLARE_R2_PUBLIC_URL` 与存储桶设置中的公共 URL 完全一致
-- 可以在浏览器中直接访问公共 URL 测试（例如：`https://pub-xxxxx.r2.dev/your-file.jpg`）
+> ⚠️ **安全建议**：生产环境建议使用子账号密钥，并限制权限范围
 
-### 6. 验证配置
+### 4. 配置公开访问
 
-#### 方法一：使用 CORS 测试工具（推荐）
+COS 支持多种公开访问方式：
 
-1. 在浏览器中打开 `scripts/test-cors.html` 文件
-2. 从应用控制台复制预签名 URL（上传照片时会在控制台显示）
-3. 将 URL 粘贴到测试工具中
-4. 点击"测试 CORS"按钮
-5. 如果测试失败，点击"生成 CORS 配置"获取正确的配置
+#### 方式 A：默认域名
 
-#### 方法二：直接测试上传
+存储桶创建后自动获得默认域名：
+```
+https://<bucket-name>-<appid>.cos.<region>.myqcloud.com
+```
 
-1. 重启开发服务器：
+例如：
+```
+https://camlife-1234567890.cos.ap-shanghai.myqcloud.com
+```
+
+#### 方式 B：CDN 加速域名（推荐生产环境）
+
+1. 在存储桶设置中，找到 **域名与传输管理** → **默认 CDN 加速域名**
+2. 开启 CDN 加速
+3. 使用生成的 CDN 域名
+
+#### 方式 C：自定义域名
+
+1. 在存储桶设置中，找到 **域名与传输管理** → **自定义加速域名**
+2. 添加您的域名并配置 CNAME 解析
+
+### 5. 环境变量配置
+
+```bash
+STORAGE_PROVIDER=tencent-cos
+TENCENT_COS_SECRET_ID=your-secret-id
+TENCENT_COS_SECRET_KEY=your-secret-key
+TENCENT_COS_BUCKET=camlife-1234567890
+TENCENT_COS_REGION=ap-shanghai
+TENCENT_COS_PREFIX=camlife
+TENCENT_COS_PUBLIC_URL=https://camlife-1234567890.cos.ap-shanghai.myqcloud.com
+```
+
+### 腾讯云 COS 地域列表
+
+| 地域 | 代码 |
+|------|------|
+| 北京 | ap-beijing |
+| 上海 | ap-shanghai |
+| 广州 | ap-guangzhou |
+| 成都 | ap-chengdu |
+| 重庆 | ap-chongqing |
+| 南京 | ap-nanjing |
+| 香港 | ap-hongkong |
+| 新加坡 | ap-singapore |
+| 东京 | ap-tokyo |
+| 首尔 | ap-seoul |
+
+完整列表：[地域和访问域名](https://cloud.tencent.com/document/product/436/6224)
+
+---
+
+## 安全最佳实践
+
+### 🔐 密钥安全
+
+1. **永远不要将密钥提交到 Git**
    ```bash
-   docker-compose -f docker-compose-dev.yml restart web
+   # 确保 .gitignore 包含
+   .env
+   .env.local
    ```
 
-2. 尝试上传一张照片
+2. **使用最小权限原则**
+   - Cloudflare R2：限制 Token 只能访问特定存储桶
+   - 腾讯云 COS：使用子账号，授予最小必要权限
 
-3. 查看浏览器控制台：
-   - 现在会显示更详细的错误信息
-   - 包括当前 Origin、上传域名等
-   - 如果 CORS 配置错误，会显示推荐的 CORS 配置 JSON
+3. **定期轮换密钥**
+   - 建议每 6-12 个月更换一次密钥
+   - 更换前先创建新密钥，测试后再删除旧密钥
 
-4. 如果仍然遇到错误，检查：
-   - 浏览器控制台的错误信息（现在包含更多调试信息）
-   - 服务器日志（会显示预签名 URL 的域名）
-   - CORS 配置是否正确（确保包含当前 Origin）
-   - 环境变量是否正确设置
+4. **使用环境变量管理服务**
+   - Vercel / Railway / Render 等平台的环境变量功能
+   - Kubernetes Secrets
+   - HashiCorp Vault
+
+### 🌐 CORS 安全配置
+
+**重要**：错误的 CORS 配置可能导致安全风险！
+
+#### 推荐：使用服务器端代理（最安全）
+
+CamLife 默认使用服务器端代理上传，**完全绕过 CORS 限制**：
+
+- ✅ 无需配置 CORS
+- ✅ 密钥仅在服务器端使用
+- ✅ 防止跨站请求伪造
+
+```bash
+# 强制使用代理（默认行为，无需设置）
+NEXT_PUBLIC_USE_UPLOAD_PROXY=true
+```
+
+#### 生产环境直接上传（需要严格配置 CORS）
+
+如果选择直接上传以减少服务器负载，**必须严格配置 CORS**：
+
+##### Cloudflare R2 CORS 配置
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://your-production-domain.com"
+    ],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["Content-Type", "Content-Length"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+##### 腾讯云 COS CORS 配置
+
+1. 进入存储桶 → **安全管理** → **跨域访问 CORS 设置**
+2. 添加规则：
+
+| 配置项 | 值 |
+|--------|-----|
+| 来源 Origin | `https://your-production-domain.com` |
+| 操作 Methods | `PUT, GET, HEAD` |
+| Allow-Headers | `Content-Type, Content-Length` |
+| Expose-Headers | `ETag` |
+| 超时 Max-Age | `3600` |
+
+> ⚠️ **安全警告**：
+> - **不要使用 `*` 作为 AllowedOrigins**
+> - 只允许必要的 HTTP 方法
+> - 限制允许的 Headers
+
+### 🔒 存储桶安全
+
+#### Cloudflare R2
+
+1. **访问控制**
+   - 生产环境：使用 **公有读私有写**
+   - 私有数据：使用 **私有** 并通过预签名 URL 访问
+
+2. **防盗链**
+   - 配置 Referer 白名单（在 WAF 规则中设置）
+
+#### 腾讯云 COS
+
+1. **访问权限**
+   - 图片展示：**公有读私有写**
+   - 私有数据：**私有读写** + 预签名 URL
+
+2. **防盗链配置**
+   - 进入存储桶 → **安全管理** → **防盗链设置**
+   - 开启防盗链，添加允许的 Referer 域名
+
+3. **跨域资源共享配置**
+   - 只允许必要的域名
+   - 定期审查 CORS 规则
+
+4. **日志监控**
+   - 开启访问日志
+   - 配置异常访问告警
+
+### 📊 监控与审计
+
+1. **开启访问日志**
+   - Cloudflare R2：在存储桶设置中启用日志
+   - 腾讯云 COS：开启访问日志并存储到指定存储桶
+
+2. **设置告警**
+   - 异常流量告警
+   - 费用超限告警
+   - API 调用失败告警
+
+3. **定期审计**
+   - 检查存储桶权限设置
+   - 审查 API 访问日志
+   - 验证 CORS 配置
+
+---
+
+## CORS 配置指南
+
+### 什么时候需要配置 CORS？
+
+| 场景 | 需要配置 CORS |
+|------|--------------|
+| 本地开发（使用代理） | ❌ 不需要 |
+| 生产环境（使用代理） | ❌ 不需要 |
+| 生产环境（直接上传） | ✅ 需要 |
+
+### 测试 CORS 配置
+
+使用浏览器开发者工具检查：
+
+1. 打开 Network 面板
+2. 尝试上传文件
+3. 检查请求是否有 CORS 错误
+4. 查看响应头中的 `Access-Control-Allow-*` 头
+
+### 常见 CORS 错误
+
+#### 错误 1: No 'Access-Control-Allow-Origin' header
+
+**原因**：CORS 策略未配置或 Origin 不在白名单
+
+**解决**：添加正确的 Origin 到 AllowedOrigins
+
+#### 错误 2: Method not allowed
+
+**原因**：AllowedMethods 中缺少请求方法
+
+**解决**：添加 `PUT` 到 AllowedMethods
+
+#### 错误 3: Header not allowed
+
+**原因**：请求头不在 AllowedHeaders 中
+
+**解决**：添加 `Content-Type` 到 AllowedHeaders
+
+---
 
 ## 常见问题
 
 ### Q: 本地开发需要配置 CORS 吗？
 
-A: **不需要！** 本地开发时，应用默认使用服务器端代理上传，完全绕过 CORS 限制。只有在生产环境使用直接上传时才需要配置 CORS。
+**A**: 不需要！本地开发时，应用默认使用服务器端代理上传，完全绕过 CORS 限制。
 
-### Q: Status 0 错误是什么？
+### Q: 如何切换存储提供商？
 
-A: 如果您在本地开发时遇到 Status 0 错误，可能是因为：
-1. 强制禁用了代理模式（`NEXT_PUBLIC_USE_UPLOAD_PROXY=false`）
-2. 尝试使用直接上传但没有配置 CORS
+**A**: 修改 `.env` 文件中的 `STORAGE_PROVIDER` 并配置相应的环境变量即可。
 
-**解决方案**：确保在 `.env.local` 中不要设置 `NEXT_PUBLIC_USE_UPLOAD_PROXY=false`，让应用使用默认的代理模式。
+### Q: 图片无法预览怎么办？
 
-### Q: 生产环境如何选择上传方式？
+**A**: 检查以下配置：
+1. 确保存储桶已开启公开访问
+2. 确保 `*_PUBLIC_URL` 配置正确
+3. 检查防盗链设置是否阻止了访问
 
-A: 
-- **使用代理**（推荐）：设置 `NEXT_PUBLIC_USE_UPLOAD_PROXY=true`，无需配置 CORS，更安全
-- **直接上传**：设置 `NEXT_PUBLIC_USE_UPLOAD_PROXY=false`，需要配置 CORS，但可以减少服务器负载
+### Q: 如何找到 Cloudflare Account ID？
 
-### Q: 如何找到我的 Account ID？
-
-A: 
+**A**: 
 1. 登录 Cloudflare Dashboard
 2. 在右侧栏可以看到 Account ID
-3. 或者在 R2 API Token 页面可以看到
+3. 或在 R2 API Token 页面查看
 
-### Q: 没有自定义域名怎么办？
+### Q: 腾讯云 COS 的 APPID 在哪里？
 
-A: 
-1. 可以使用 Cloudflare 提供的临时公共 URL
-2. 在存储桶设置中找到 **Public Access** → **R2.dev subdomain**
-3. 启用后会得到一个类似 `https://pub-xxxxx.r2.dev` 的 URL
-4. 将此 URL 设置为 `CLOUDFLARE_R2_PUBLIC_URL`
+**A**: 
+1. 登录腾讯云控制台
+2. 进入 [账号信息](https://console.cloud.tencent.com/developer)
+3. 找到 APPID 字段
 
-### Q: 上传的文件在哪里？
+### Q: 上传的文件在哪里查看？
 
-A: 
-- 文件存储在您创建的 R2 存储桶中
-- 可以通过 Cloudflare Dashboard → R2 → 您的存储桶查看
-- 如果配置了公共访问，可以通过 `CLOUDFLARE_R2_PUBLIC_URL` 访问
+**A**: 
+- **Cloudflare R2**：Dashboard → R2 → 存储桶 → Objects
+- **腾讯云 COS**：控制台 → 存储桶 → 文件列表
 
-### Q: 如何测试配置是否正确？
+### Q: 如何测试存储配置是否正确？
 
-A: 可以使用 AWS CLI 测试（R2 兼容 S3 API）：
+**A**: 使用 AWS CLI 测试（R2 和 COS 都兼容 S3 API）：
 
 ```bash
-# 安装 AWS CLI
-# macOS: brew install awscli
+# 测试 Cloudflare R2
+aws s3 ls s3://your-bucket \
+  --endpoint-url https://your-account-id.r2.cloudflarestorage.com \
+  --profile r2
 
-# 配置凭证
-aws configure --profile r2
-# AWS Access Key ID: 您的 CLOUDFLARE_R2_ACCESS_KEY_ID
-# AWS Secret Access Key: 您的 CLOUDFLARE_R2_SECRET_ACCESS_KEY
-# Default region: auto
-# Default output format: json
-
-# 测试连接
-aws s3 ls s3://your-bucket-name --endpoint-url https://your-account-id.r2.cloudflarestorage.com --profile r2
+# 测试腾讯云 COS
+aws s3 ls s3://your-bucket-appid \
+  --endpoint-url https://cos.ap-shanghai.myqcloud.com \
+  --profile cos
 ```
 
-## 安全提示
-
-1. **永远不要提交 `.env.local` 到 Git**
-2. 定期轮换 API Token
-3. 使用最小权限原则（只授予必要的权限）
-4. 在生产环境中使用环境变量管理服务（如 Vercel、Railway 等）
+---
 
 ## 下一步
 
 配置完成后：
-1. 重启开发服务器
+
+1. 重启应用服务
 2. 尝试上传照片
-3. 如果遇到问题，查看浏览器控制台和服务器日志
+3. 检查照片是否可以正常预览
+4. 如遇问题，查看浏览器控制台和服务器日志
 
 祝您使用愉快！🎉
-

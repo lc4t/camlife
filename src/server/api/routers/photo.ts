@@ -2,8 +2,12 @@ import { TRPCError } from '@trpc/server'
 import { desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { env } from '@/env'
-import { deleteFile, getPublicUrl, getSignedUrlForUpload } from '@/lib/storage'
-import { getS3Client } from '@/lib/storage/s3-client'
+import {
+  deleteFile,
+  getPublicUrl,
+  getS3Client,
+  getSignedUrlForUpload,
+} from '@/lib/storage/server'
 import {
   createTRPCRouter,
   protectedProcedure,
